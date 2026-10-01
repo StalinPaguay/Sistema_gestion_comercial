@@ -11,8 +11,23 @@ services:
     volumes:
       - sqlserver_data:/var/opt/mssql
 
+  backend:
+    build:
+      context: ./backend
+    container_name: tecnomega_backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      - database
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: tecnomega_frontend
+    ports:
+      - "4200:4200"
+    depends_on:
+      - backend
+
 volumes:
   sqlserver_data:
-
-
-
