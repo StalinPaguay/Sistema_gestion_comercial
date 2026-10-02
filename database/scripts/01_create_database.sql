@@ -33,6 +33,7 @@ GO
 -- 1. CREAR BASE DE DATOS
 
 USE TECNOMEGA;
+GO
 
 -- 2. ROLES
 
@@ -1649,6 +1650,7 @@ BEGIN
     );
 
 END;
+GO
 
                          -- TRIGGER --
    
@@ -1769,6 +1771,7 @@ BEGIN
        M.ProductoId;
 
 END;
+GO
 
                          -- FUNCION --
 
@@ -1807,6 +1810,7 @@ BEGIN
     RETURN @Total;
 
 END;
+GO
 
                  -- PROCEDIMIENTO ENTRADA INVENTARIO --
 
@@ -1932,6 +1936,7 @@ BEGIN
     WHERE ProductoId = @ProductoId;
 
 END;
+GO
 
    -- PROCEDIMIENTO SALIDA INVENTARIO --
 
@@ -2076,6 +2081,7 @@ BEGIN
     WHERE ProductoId = @ProductoId;
 
 END;
+GO
 
    -- PROCEDIMIENTO AJUSTE INVENTARIO --
 
@@ -2157,6 +2163,7 @@ BEGIN
     WHERE ProductoId = @ProductoId;
 
 END;
+GO
 
    -- CONSULTAR STOCK --
 
@@ -2199,6 +2206,7 @@ BEGIN
     WHERE P.ProductoId = @ProductoId;
 
 END;
+GO
 
    -- PRODUCTOS STOCK BAJO --
 
@@ -2243,6 +2251,7 @@ BEGIN
     ORDER BY P.Stock ASC;
 
 END;
+GO
 
    -- CONSULTAR MOVIMIENTOS --
 
@@ -2305,6 +2314,7 @@ BEGIN
     ORDER BY MI.Fecha DESC;
 
 END;
+GO
 
    -- CONSULTAR FACTURAS POR FECHA --
 
@@ -2357,6 +2367,7 @@ BEGIN
     ORDER BY F.Fecha DESC;
 
 END;
+GO
 
    -- CONSULTAR FACTURA --
 
@@ -2427,6 +2438,7 @@ BEGIN
           @FacturaId;
 
 END;
+GO
 
                          -- INDICES --
 
@@ -2477,6 +2489,7 @@ ON DetallesFactura(ProductoId);
 
 CREATE INDEX IX_Promociones_Fechas
 ON Promociones(FechaInicio, FechaFin);
+GO
 
                           -- VISTAS --
 -- VISTA INVENTARIO --
@@ -2525,6 +2538,7 @@ INNER JOIN Categorias C
 INNER JOIN Marcas M
     ON P.MarcaId =
        M.MarcaId;
+GO
 
 -- VISTA VENTAS --
 
@@ -2559,6 +2573,7 @@ FROM Facturas F
 INNER JOIN Clientes C
     ON F.ClienteId =
        C.ClienteId;
+GO
 
 -- VISTA PRODUCTOS CON IMAGEN --
 
@@ -2604,6 +2619,7 @@ LEFT JOIN ImagenesProducto I
        I.ProductoId
 
     AND I.EsPrincipal = 1;
+GO
 
                      -- COMPROBACION FINAL --
 
