@@ -41,3 +41,9 @@ from models.proveedor import Proveedor
 # ============================================================
 
 from models.producto import Producto
+
+# ============================================================
+# REGISTRO DEL MODELO DE IMÁGENES DE PRODUCTOS
+# ============================================================
+
+from models.imagen_producto import ImagenProducto
