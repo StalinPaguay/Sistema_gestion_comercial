@@ -15,6 +15,9 @@ services:
     build:
       context: ./backend
     container_name: tecnomega_backend
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+      MSSQL_DATABASE: ${MSSQL_DATABASE}
     ports:
       - "8000:8000"
     depends_on:
