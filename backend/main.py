@@ -1,31 +1,19 @@
-# ============================================================
-# CONFIGURACIÓN PRINCIPAL DE FASTAPI
-# ============================================================
 
 from fastapi import FastAPI
 
 from routes.database_routes import router as database_router
+from routes.catalogo_routes import router as catalogo_router
 
-
-# ============================================================
-# CREACIÓN DE LA APLICACIÓN
-# ============================================================
-
-app = FastAPI(title="TECNOMEGA API")
-
-
-# ============================================================
-# REGISTRO DE RUTAS
-# ============================================================
+app = FastAPI(
+    title="TECNOMEGA API",
+    description="API de gestión comercial TECNOMEGA",
+    version="1.0.0",
+)
 
 app.include_router(database_router)
+app.include_router(catalogo_router)
 
-
-# ============================================================
-# RUTA PRINCIPAL
-# ============================================================
 
 @app.get("/")
 def root():
-    # Retorna un mensaje para comprobar que la API funciona
     return {"message": "API TECNOMEGA funcionando"}

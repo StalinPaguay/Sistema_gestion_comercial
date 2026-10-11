@@ -1,111 +1,132 @@
 # ============================================================
-# MODELO DE PRODUCTOS
+# MODELO DE PRODUCTOS - TECNOMEGA
+# Descripción:
+#   Define la estructura ORM de la tabla Productos en SQL Server.
+#   Las columnas y sus tipos corresponden al esquema existente
+#   de la base de datos.
 # ============================================================
 
-from datetime import datetime
+from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from config.database import Base
-from models.categoria import Categoria
-from models.marca import Marca
-from models.proveedor import Proveedor
 
-
-# ============================================================
-# CLASE PRODUCTO
-# ============================================================
 
 class Producto(Base):
-    # Nombre de la tabla en SQL Server
+    """
+    Modelo ORM de productos comerciales.
+
+    Representa la tabla Productos y establece las relaciones
+    con las tablas Categorias y Marcas.
+    """
+
+    # Nombre exacto de la tabla existente en SQL Server.
     __tablename__ = "Productos"
 
-    # Identificador único del producto
+    # --------------------------------------------------------
+    # Identificador principal
+    # --------------------------------------------------------
     ProductoId: Mapped[int] = mapped_column(
         Integer,
         primary_key=True,
-        autoincrement=True
+        autoincrement=True,
+        comment="Identificador único del producto",
     )
 
-    # Identificador de la categoría
+    # --------------------------------------------------------
+    # Relación con la categoría del producto
+    # --------------------------------------------------------
     CategoriaId: Mapped[int] = mapped_column(
+        Integer,
         ForeignKey("Categorias.CategoriaId"),
-        nullable=False
+        nullable=False,
+        comment="Identificador de la categoría asociada",
     )
 
-    # Relación con la categoría
-    Categoria: Mapped["Categoria"] = relationship(
-        "Categoria"
-    )
-
-    # Identificador de la marca
+    # --------------------------------------------------------
+    # Relación con la marca del producto
+    # --------------------------------------------------------
     MarcaId: Mapped[int] = mapped_column(
+        Integer,
         ForeignKey("Marcas.MarcaId"),
-        nullable=False
+        nullable=False,
+        comment="Identificador de la marca asociada",
     )
 
-    # Relación con la marca
-    Marca: Mapped["Marca"] = relationship(
-        "Marca"
-    )
-
-    # Identificador del proveedor
-    ProveedorId: Mapped[int] = mapped_column(
-        ForeignKey("Proveedores.ProveedorId"),
-        nullable=False
-    )
-
-    # Relación con el proveedor
-    Proveedor: Mapped["Proveedor"] = relationship(
-        "Proveedor"
-    )
-
-    # Nombre del producto
-    Nombre: Mapped[str] = mapped_column(
-        String(200),
-        nullable=False
-    )
-
-    # Descripción del producto
-    Descripcion: Mapped[str | None] = mapped_column(
-        String,
-        nullable=True
-    )
-
-    # Precio del producto
-    Precio: Mapped[float] = mapped_column(
-        Numeric(18, 2),
-        nullable=False
-    )
-
-    # Cantidad disponible en inventario
-    Stock: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False
-    )
-
-    # Stock mínimo permitido
-    StockMinimo: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False
-    )
-
-    # Código único del producto
+    # --------------------------------------------------------
+    # Código único de identificación del producto
+    # --------------------------------------------------------
+    # La base de datos ya dispone del índice único
+    # UQ_Productos_SKU para evitar códigos duplicados.
     SKU: Mapped[str] = mapped_column(
         String(50),
         unique=True,
-        nullable=False
+        nullable=False,
+        comment="Código único de identificación del producto",
     )
 
-    # Estado del producto
+    # --------------------------------------------------------
+    # Información descriptiva
+    # --------------------------------------------------------
+    Nombre: Mapped[str] = mapped_column(
+        String(150),
+        nullable=False,
+        comment="Nombre comercial del producto",
+    )
+
+    Descripcion: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+        comment="Descripción detallada del producto",
+    )
+
+    # --------------------------------------------------------
+    # Información económica
+    # --------------------------------------------------------
+    # Decimal permite representar importes con precisión.
+    # Numeric(18, 2) corresponde a la precisión de SQL Server.
+    Precio: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2),
+        nullable=False,
+        comment="Precio unitario del producto",
+    )
+
+    # --------------------------------------------------------
+    # Control de inventario
+    # --------------------------------------------------------
+    Stock: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        comment="Cantidad disponible en inventario",
+    )
+
+    StockMinimo: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        comment="Nivel mínimo de inventario permitido",
+    )
+
+    # --------------------------------------------------------
+    # Estado del registro
+    # --------------------------------------------------------
+    # Permite distinguir productos activos de productos inactivos.
     Estado: Mapped[bool] = mapped_column(
         Boolean,
-        nullable=False
+        nullable=False,
+        comment="Indica si el producto está activo",
     )
 
-    # Fecha de creación del producto
-    FechaCreacion: Mapped[datetime] = mapped_column(
-        DateTime,
-        nullable=False
+    # --------------------------------------------------------
+    # Relaciones ORM
+    # --------------------------------------------------------
+    # Facilitan el acceso a la categoría y a la marca asociadas
+    # mediante SQLAlchemy, sin agregar columnas a la tabla.
+    Categoria: Mapped["Categoria"] = relationship(
+        "Categoria",
+    )
+
+    Marca: Mapped["Marca"] = relationship(
+        "Marca",
     )
