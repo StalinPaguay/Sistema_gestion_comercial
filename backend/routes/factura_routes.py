@@ -43,7 +43,7 @@ class PagoEntrada(BaseModel):
 
 def generar_numero_factura(db: Session) -> str:
     """Genera un secuencial para la factura (ej: FAC-2026-000001)."""
-    anio = datetime.utcnow().year
+    anio = datetime.now().year
     ultimo = db.query(Factura).order_by(Factura.FacturaId.desc()).first()
     siguiente_id = (ultimo.FacturaId + 1) if ultimo else 1
     return f"FAC-{anio}-{siguiente_id:06d}"
@@ -82,6 +82,7 @@ def serializar_factura(fac: Factura, db: Session) -> dict[str, Any]:
     return {
         "FacturaId": fac.FacturaId,
         "Numero": fac.Numero,
+        "NumeroFactura": fac.Numero,
         "PedidoId": fac.PedidoId,
         "ClienteId": fac.ClienteId,
         "Cliente": cli_info,
@@ -187,7 +188,7 @@ def emitir_factura(
             PedidoId=pedido.PedidoId,
             ClienteId=pedido.ClienteId,
             UsuarioId=usuario.UsuarioId,
-            Fecha=datetime.utcnow(),
+            Fecha=datetime.now(),
             Subtotal=Decimal("0.00"),
             Descuento=Decimal("0.00"),
             Impuesto=Decimal("0.00"),
@@ -198,15 +199,18 @@ def emitir_factura(
         db.flush()
 
         for d in detalles_pedido:
+            desc_val = d.Descuento if d.Descuento else Decimal("0.00")
+            desc_pct = round((desc_val / d.Subtotal) * Decimal("100.0"), 2) if d.Subtotal > 0 else Decimal("0.00")
+            line_total = max(Decimal("0.00"), d.Subtotal - desc_val)
             det_fac = DetalleFactura(
                 FacturaId=factura.FacturaId,
                 ProductoId=d.ProductoId,
                 Cantidad=d.Cantidad,
                 PrecioUnitario=d.PrecioUnitario,
-                DescuentoPorcentaje=Decimal("0.00"),
-                DescuentoValor=Decimal("0.00"),
+                DescuentoPorcentaje=desc_pct,
+                DescuentoValor=desc_val,
                 Subtotal=d.Subtotal,
-                Total=d.Total,
+                Total=line_total,
             )
             db.add(det_fac)
 
@@ -277,7 +281,7 @@ def registrar_pago(
         pago = Pago(
             PedidoId=datos.PedidoId,
             MetodoPagoId=datos.MetodoPagoId,
-            FechaPago=datetime.utcnow(),
+            FechaPago=datetime.now(),
             Monto=datos.Monto,
             Estado="Pagado",
             TransaccionId=datos.TransaccionId,
@@ -291,6 +295,10 @@ def registrar_pago(
 
         if total_pagado >= pedido.Total and pedido.Estado == "Pendiente":
             pedido.Estado = "Procesando"
+
+        factura = db.query(Factura).filter(Factura.PedidoId == pedido.PedidoId, Factura.Estado != "Anulada").first()
+        if factura and total_pagado >= factura.Total:
+            factura.Estado = "Pagada"
 
         db.commit()
         db.refresh(pago)

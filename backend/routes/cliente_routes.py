@@ -214,6 +214,55 @@ def actualizar_cliente(
 # ENDPOINTS DE DIRECCIONES
 # ============================================================
 
+@router.get("/me/direcciones", summary="Listar direcciones del cliente autenticado")
+def listar_mis_direcciones(
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+):
+    cliente = db.query(Cliente).filter(Cliente.PersonaId == usuario.PersonaId).first()
+    if not cliente:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Perfil de cliente no encontrado.")
+
+    direcciones = (
+        db.query(DireccionCliente)
+        .filter(DireccionCliente.ClienteId == cliente.ClienteId, DireccionCliente.Estado == True)
+        .all()
+    )
+    return [serializar_direccion(d) for d in direcciones]
+
+
+@router.post("/me/direcciones", status_code=status.HTTP_201_CREATED, summary="Agregar dirección al cliente autenticado")
+def agregar_mi_direccion(
+    datos: DireccionEntrada,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+):
+    cliente = db.query(Cliente).filter(Cliente.PersonaId == usuario.PersonaId).first()
+    if not cliente:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Perfil de cliente no encontrado.")
+
+    if datos.EsPrincipal:
+        db.query(DireccionCliente).filter(
+            DireccionCliente.ClienteId == cliente.ClienteId,
+            DireccionCliente.EsPrincipal == True,
+        ).update({"EsPrincipal": False})
+
+    nueva_dir = DireccionCliente(
+        ClienteId=cliente.ClienteId,
+        Provincia=datos.Provincia,
+        Ciudad=datos.Ciudad,
+        Direccion=datos.Direccion,
+        Referencia=datos.Referencia,
+        CodigoPostal=datos.CodigoPostal,
+        EsPrincipal=datos.EsPrincipal,
+        Estado=True,
+    )
+    db.add(nueva_dir)
+    db.commit()
+    db.refresh(nueva_dir)
+    return serializar_direccion(nueva_dir)
+
+
 @router.get("/{cliente_id}/direcciones", summary="Listar direcciones de un cliente")
 def listar_direcciones(
     cliente_id: int,

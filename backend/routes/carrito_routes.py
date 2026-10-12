@@ -52,7 +52,7 @@ def obtener_o_crear_carrito(db: Session, usuario: Usuario) -> Carrito:
 
     carrito = db.query(Carrito).filter(Carrito.ClienteId == cliente.ClienteId).first()
     if not carrito:
-        carrito = Carrito(ClienteId=cliente.ClienteId, FechaActualizacion=datetime.utcnow())
+        carrito = Carrito(ClienteId=cliente.ClienteId, FechaActualizacion=datetime.now())
         db.add(carrito)
         db.commit()
         db.refresh(carrito)
@@ -145,7 +145,7 @@ def agregar_item(
         )
         db.add(detalle)
 
-    carrito.FechaActualizacion = datetime.utcnow()
+    carrito.FechaActualizacion = datetime.now()
     db.commit()
     db.refresh(carrito)
 
@@ -172,7 +172,7 @@ def actualizar_item(
         )
 
     detalle.Cantidad = datos.Cantidad
-    carrito.FechaActualizacion = datetime.utcnow()
+    carrito.FechaActualizacion = datetime.now()
     db.commit()
     db.refresh(carrito)
 
@@ -191,7 +191,7 @@ def eliminar_item(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item no encontrado en su carrito.")
 
     db.delete(detalle)
-    carrito.FechaActualizacion = datetime.utcnow()
+    carrito.FechaActualizacion = datetime.now()
     db.commit()
     db.refresh(carrito)
 
@@ -205,7 +205,7 @@ def vaciar_carrito(
 ):
     carrito = obtener_o_crear_carrito(db, usuario)
     db.query(DetalleCarrito).filter(DetalleCarrito.CarritoId == carrito.CarritoId).delete()
-    carrito.FechaActualizacion = datetime.utcnow()
+    carrito.FechaActualizacion = datetime.now()
     db.commit()
     db.refresh(carrito)
 

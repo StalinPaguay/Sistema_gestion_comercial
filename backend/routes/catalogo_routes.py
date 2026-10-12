@@ -35,6 +35,7 @@ from config.database import get_db
 from models.categoria import Categoria
 from models.marca import Marca
 from models.producto import Producto
+from services.auth_service import require_admin
 
 
 # ============================================================
@@ -507,6 +508,7 @@ def obtener_producto(
 def crear_producto(
     datos: ProductoEntrada,
     db: Session = Depends(get_db),
+    _user: Any = Depends(require_admin),
 ) -> dict[str, Any]:
     """Crea un producto después de validar sus referencias."""
 
@@ -525,6 +527,7 @@ def actualizar_producto(
     producto_id: int,
     datos: ProductoActualizacion,
     db: Session = Depends(get_db),
+    _user: Any = Depends(require_admin),
 ) -> dict[str, Any]:
     """
     Actualiza únicamente los campos enviados por el cliente.
@@ -576,6 +579,7 @@ def actualizar_producto(
 def eliminar_producto(
     producto_id: int,
     db: Session = Depends(get_db),
+    _user: Any = Depends(require_admin),
 ) -> dict[str, str]:
     """
     Realiza una eliminación lógica del producto.
@@ -663,6 +667,7 @@ def obtener_categoria(
 def crear_categoria(
     datos: CategoriaEntrada,
     db: Session = Depends(get_db),
+    _user: Any = Depends(require_admin),
 ) -> dict[str, Any]:
     """Crea una categoría."""
 
@@ -678,6 +683,7 @@ def actualizar_categoria(
     categoria_id: int,
     datos: CategoriaActualizacion,
     db: Session = Depends(get_db),
+    _user: Any = Depends(require_admin),
 ) -> dict[str, Any]:
     """
     Actualiza los campos enviados de una categoría.
@@ -719,6 +725,7 @@ def actualizar_categoria(
 def eliminar_categoria(
     categoria_id: int,
     db: Session = Depends(get_db),
+    _user: Any = Depends(require_admin),
 ) -> dict[str, str]:
     """
     Desactiva una categoría sin borrar físicamente el registro.
@@ -803,6 +810,7 @@ def obtener_marca(
 def crear_marca(
     datos: MarcaEntrada,
     db: Session = Depends(get_db),
+    _user: Any = Depends(require_admin),
 ) -> dict[str, Any]:
     """Crea una marca."""
 
@@ -818,6 +826,7 @@ def actualizar_marca(
     marca_id: int,
     datos: MarcaActualizacion,
     db: Session = Depends(get_db),
+    _user: Any = Depends(require_admin),
 ) -> dict[str, Any]:
     """
     Actualiza una marca.
@@ -860,6 +869,7 @@ def actualizar_marca(
 def eliminar_marca(
     marca_id: int,
     db: Session = Depends(get_db),
+    _user: Any = Depends(require_admin),
 ) -> dict[str, str]:
     """
     Desactiva una marca sin borrar físicamente el registro.

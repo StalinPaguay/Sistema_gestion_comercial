@@ -139,7 +139,7 @@ def registrar_movimiento(
             UsuarioId=usuario.UsuarioId,
             TipoMovimientoId=datos.TipoMovimientoId,
             Cantidad=datos.Cantidad,
-            Fecha=datetime.utcnow(),
+            Fecha=datetime.now(),
             Motivo=datos.Motivo,
             Observacion=datos.Observacion,
         )

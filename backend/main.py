@@ -11,8 +11,10 @@ from routes.catalogo_routes import router as catalogo_router
 from routes.cliente_routes import router as cliente_router
 from routes.database_routes import router as database_router
 from routes.factura_routes import router as factura_router
+from routes.interaccion_routes import router as interaccion_router
 from routes.inventario_routes import router as inventario_router
 from routes.pedido_routes import router as pedido_router
+from routes.promocion_routes import router as promocion_router
 from routes.proveedor_routes import router as proveedor_router
 
 app = FastAPI(
@@ -40,6 +42,8 @@ app.include_router(pedido_router)
 app.include_router(factura_router)
 app.include_router(inventario_router)
 app.include_router(proveedor_router)
+app.include_router(promocion_router)
+app.include_router(interaccion_router)
 
 
 @app.get("/", tags=["Salud"])

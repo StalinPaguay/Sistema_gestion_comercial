@@ -18,6 +18,9 @@ from models.direccion_cliente import DireccionCliente
 from models.pedido import Pedido
 from models.pedido_detalle import PedidoDetalle
 from models.producto import Producto
+from models.promocion import Promocion
+from models.promocion_categoria import PromocionCategoria
+from models.promocion_producto import PromocionProducto
 from models.usuario import Usuario
 from services.auth_service import get_current_user
 
@@ -39,6 +42,7 @@ class ItemPedidoEntrada(BaseModel):
 class CrearPedidoEntrada(BaseModel):
     DireccionId: int = Field(gt=0, description="Identificador de la dirección de entrega")
     PromocionId: int | None = Field(default=None, description="Identificador de promoción opcional")
+    CodigoCupon: str | None = Field(default=None, description="Código de cupón opcional (ej: PROMO10)")
     Items: list[ItemPedidoEntrada] | None = Field(
         default=None,
         description="Lista de productos. Si no se envía o está vacía, se toma del carrito de compras.",
@@ -222,20 +226,68 @@ def crear_pedido(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Stock insuficiente para '{prod.Nombre}'. Disponibles: {prod.Stock}, solicitados: {cant}.",
             )
-
         subtotal_linea = prod.Precio * cant
         subtotal_calculado += subtotal_linea
         detalles_para_crear.append((prod, cant, subtotal_linea))
 
+    # 5. Validar y calcular descuento promocional si aplica
+    promocion_aplicada = None
+    if datos.CodigoCupon or datos.PromocionId:
+        query_promo = db.query(Promocion).filter(Promocion.Estado == True)
+        if datos.CodigoCupon:
+            query_promo = query_promo.filter(Promocion.CodigoCupon == datos.CodigoCupon.strip().upper())
+        elif datos.PromocionId:
+            query_promo = query_promo.filter(Promocion.PromocionId == datos.PromocionId)
+        promocion_aplicada = query_promo.first()
+
+        now = datetime.now()
+        if not promocion_aplicada:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cupón o promoción no encontrada o inactiva.")
+        if now < promocion_aplicada.FechaInicio or now > promocion_aplicada.FechaFin:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La promoción está fuera de su período de vigencia.")
+        if subtotal_calculado < promocion_aplicada.MontoMinimoCompra:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"El subtotal (${subtotal_calculado}) no alcanza el monto mínimo de la promoción (${promocion_aplicada.MontoMinimoCompra}).",
+            )
+
+    descuentos_lineas: dict[int, Decimal] = {}
+    if promocion_aplicada:
+        prods_promo = [x.ProductoId for x in db.query(PromocionProducto).filter(PromocionProducto.PromocionId == promocion_aplicada.PromocionId).all()]
+        cats_promo = [x.CategoriaId for x in db.query(PromocionCategoria).filter(PromocionCategoria.PromocionId == promocion_aplicada.PromocionId).all()]
+
+        items_calificantes = []
+        subtotal_calificante = Decimal("0.00")
+        for prod, cant, subtotal_linea in detalles_para_crear:
+            aplica = True
+            if prods_promo and prod.ProductoId not in prods_promo:
+                aplica = False
+            if cats_promo and prod.CategoriaId not in cats_promo:
+                aplica = False
+            if aplica:
+                items_calificantes.append((prod, cant, subtotal_linea))
+                subtotal_calificante += subtotal_linea
+
+        if promocion_aplicada.TipoDescuento == "PORCENTAJE":
+            pct = promocion_aplicada.ValorDescuento / Decimal("100.0")
+            for prod, cant, subtotal_linea in items_calificantes:
+                desc = round(subtotal_linea * pct, 2)
+                descuentos_lineas[prod.ProductoId] = desc
+        elif promocion_aplicada.TipoDescuento == "MONTO_FIJO" and subtotal_calificante > 0:
+            monto_fijo = min(promocion_aplicada.ValorDescuento, subtotal_calificante)
+            for prod, cant, subtotal_linea in items_calificantes:
+                desc = min(round((subtotal_linea / subtotal_calificante) * monto_fijo, 2), subtotal_linea)
+                descuentos_lineas[prod.ProductoId] = desc
+
     try:
-        # 5. Crear cabecera del Pedido con valores iniciales
-        # El trigger TR_PedidoDetalle_ActualizarTotales recalculará con IVA
+        # 6. Crear cabecera del Pedido con valores iniciales
+        # El trigger TR_PedidoDetalle_ActualizarTotales recalculará automáticamente
         pedido = Pedido(
             UsuarioId=usuario.UsuarioId,
             ClienteId=cliente.ClienteId,
             DireccionId=datos.DireccionId,
-            PromocionId=datos.PromocionId,
-            FechaPedido=datetime.utcnow(),
+            PromocionId=promocion_aplicada.PromocionId if promocion_aplicada else None,
+            FechaPedido=datetime.now(),
             Subtotal=subtotal_calculado,
             Descuento=Decimal("0.00"),
             IVA=Decimal("0.00"),
@@ -245,16 +297,18 @@ def crear_pedido(
         db.add(pedido)
         db.flush()
 
-        # 6. Crear detalles del pedido
+        # 7. Crear detalles del pedido con sus descuentos
         for prod, cant, subtotal_linea in detalles_para_crear:
+            desc_linea = descuentos_lineas.get(prod.ProductoId, Decimal("0.00"))
+            total_linea = max(Decimal("0.00"), subtotal_linea - desc_linea)
             det = PedidoDetalle(
                 PedidoId=pedido.PedidoId,
                 ProductoId=prod.ProductoId,
                 Cantidad=cant,
                 PrecioUnitario=prod.Precio,
                 Subtotal=subtotal_linea,
-                Descuento=Decimal("0.00"),
-                Total=subtotal_linea,
+                Descuento=desc_linea,
+                Total=total_linea,
             )
             db.add(det)
 
