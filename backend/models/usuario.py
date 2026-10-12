@@ -1,6 +1,5 @@
-
 # ============================================================
-# MODELO DE USUARIOS
+# MODELO DE USUARIOS - TECNOMEGA
 # ============================================================
 
 from datetime import datetime
@@ -9,74 +8,60 @@ from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from config.database import Base
+from models.persona import Persona
 from models.rol import Rol
 
 
-# ============================================================
-# CLASE USUARIO
-# ============================================================
-
 class Usuario(Base):
-    # Nombre de la tabla en SQL Server
+    """
+    Representa una cuenta de acceso al sistema, vinculada
+    a una Persona y a un Rol de autorización.
+    """
+
     __tablename__ = "Usuarios"
 
-    # Identificador único del usuario
     UsuarioId: Mapped[int] = mapped_column(
         Integer,
         primary_key=True,
-        autoincrement=True
+        autoincrement=True,
+        comment="Identificador único del usuario",
     )
 
-    # Identificador del rol del usuario
-    RolId: Mapped[int] = mapped_column(
-        ForeignKey("Roles.RolId"),
-        nullable=False
-    )
-
-    # Relación con el modelo de roles
-    Rol: Mapped["Rol"] = relationship(
-        "Rol"
-    )
-
-    # Nombres del usuario
-    Nombres: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False
-    )
-
-    # Apellidos del usuario
-    Apellidos: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False
-    )
-
-    # Correo electrónico del usuario
-    Email: Mapped[str] = mapped_column(
-        String(150),
+    PersonaId: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("Personas.PersonaId"),
+        nullable=False,
         unique=True,
-        nullable=False
+        comment="Identificador de la persona asociada",
     )
 
-    # Contraseña almacenada como hash
+    RolId: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("Roles.RolId"),
+        nullable=False,
+        comment="Identificador del rol del usuario",
+    )
+
     PasswordHash: Mapped[str] = mapped_column(
         String(255),
-        nullable=False
+        nullable=False,
+        comment="Hash seguro de la contraseña",
     )
 
-    # Número telefónico del usuario
-    Telefono: Mapped[str | None] = mapped_column(
-        String(20),
-        nullable=True
-    )
-
-    # Fecha de registro del usuario
     FechaRegistro: Mapped[datetime] = mapped_column(
         DateTime,
-        nullable=False
+        default=datetime.utcnow,
+        nullable=False,
+        comment="Fecha y hora de creación de la cuenta",
     )
 
-    # Estado del usuario
     Estado: Mapped[bool] = mapped_column(
         Boolean,
-        nullable=False
+        default=True,
+        nullable=False,
+        comment="Indica si la cuenta está activa",
     )
+
+    # Relaciones ORM
+    Persona: Mapped["Persona"] = relationship("Persona")
+    Rol: Mapped["Rol"] = relationship("Rol")

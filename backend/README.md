@@ -2,255 +2,157 @@
 
 ## 1. Descripción del proyecto
 
-Backend desarrollado con **Python, FastAPI, SQLAlchemy y SQL Server** para el sistema de gestión comercial TECNOMEGA.
+Backend integral desarrollado con **Python, FastAPI, SQLAlchemy y Microsoft SQL Server** para el sistema de gestión comercial TECNOMEGA.
 
-La API permite consultar y gestionar el catálogo de productos, categorías y marcas. La conexión a la base de datos se configura mediante variables de entorno.
+Provee una API REST completa y robusta con autenticación JWT, gestión de catálogo, clientes, carrito de compras, pedidos, facturación, métodos de pago, inventario y proveedores.
 
-## 2. Tecnologías
+## 2. Tecnologías y Librerías
 
-- Python 3.14 en la imagen Docker actual.
-- FastAPI para la API REST.
-- SQLAlchemy para el acceso a SQL Server.
-- pyodbc para la conexión con SQL Server.
-- Microsoft ODBC Driver 18.
-- SQL Server 2022.
-- Docker y Docker Compose.
-
-Las dependencias de Python se encuentran en `backend/requirements.txt`.
+- **Python 3.14** (Entorno Dockerizado).
+- **FastAPI**: Framework web moderno, asíncrono y de alto rendimiento.
+- **SQLAlchemy 2.1**: ORM para mapeo objeto-relacional y manejo de transacciones.
+- **pyodbc & Microsoft ODBC Driver 18**: Conector nativo de alto rendimiento para SQL Server.
+- **PyJWT & Bcrypt**: Autenticación segura mediante tokens JWT y cifrado de contraseñas con salado.
+- **Pytest & HTTPX**: Suite de pruebas automatizadas de integración.
+- **SQL Server 2022**: Motor de base de datos relacional con triggers de integridad, inventario y auditoría.
+- **Docker y Docker Compose**: Orquestación de contenedores y entorno reproducible.
 
 ## 3. Estructura del backend
 
 ```text
 backend/
 ├── config/
-│   └── database.py
+│   └── database.py          # Conexión SQLAlchemy, pool y sesiones de BD
 ├── controllers/
 │   └── database_controller.py
-├── models/
+├── models/                  # 25 modelos ORM mapeados al esquema de SQL Server
+│   ├── persona.py
+│   ├── usuario.py
+│   ├── cliente.py
+│   ├── producto.py
 │   ├── categoria.py
 │   ├── marca.py
-│   ├── producto.py
+│   ├── carrito.py
+│   ├── carrito_detalle.py
+│   ├── pedido.py
+│   ├── pedido_detalle.py
+│   ├── factura.py
+│   ├── detalle_factura.py
+│   ├── pago.py
+│   ├── metodo_pago.py
+│   ├── inventario...
 │   └── ...
-├── routes/
-│   ├── catalogo_routes.py
-│   └── database_routes.py
+├── routes/                  # Endpoints REST organizados por módulo
+│   ├── auth_routes.py       # Login, registro y perfil JWT (/auth)
+│   ├── catalogo_routes.py   # Productos, categorías y marcas
+│   ├── cliente_routes.py    # Gestión de clientes y direcciones (/clientes)
+│   ├── carrito_routes.py    # Carrito de compras y sus items (/carrito)
+│   ├── pedido_routes.py     # Creación, consulta y estados de pedidos (/pedidos)
+│   ├── factura_routes.py    # Emisión de facturas y pagos (/facturas, /pagos)
+│   ├── inventario_routes.py # Movimientos de stock y stock bajo (/inventario)
+│   ├── proveedor_routes.py  # Proveedores (/proveedores)
+│   └── database_routes.py   # Health check de BD (/database)
 ├── services/
-├── views/
+│   └── auth_service.py      # Lógica de seguridad, JWT y hashing bcrypt
+├── tests/
+│   └── test_api.py          # Pruebas automatizadas de integración
 ├── Dockerfile
-├── .dockerignore
-├── .gitignore
-├── main.py
+├── main.py                  # Aplicación FastAPI, CORS y routers
 └── requirements.txt
 ```
 
-- `config/database.py`: configura la conexión y las sesiones de SQLAlchemy.
-- `models/`: contiene los modelos ORM.
-- `routes/catalogo_routes.py`: implementa las operaciones del catálogo.
-- `routes/database_routes.py`: expone la comprobación de conexión.
-- `controllers/database_controller.py`: consulta el nombre de la base de datos conectada.
-- `main.py`: crea la aplicación FastAPI y registra los routers.
-- `Dockerfile`: define la imagen del backend.
+## 4. Requisitos previos e Inicio Rápido
 
-## 4. Requisitos previos
+1. Crear el archivo `.env` en la raíz del repositorio basándose en `.env.example`:
+   ```dotenv
+   MSSQL_SA_PASSWORD=S3guro!2025
+   MSSQL_DATABASE=TECNOMEGA
+   MSSQL_PID=Developer
+   BACKEND_PORT=8000
+   FRONTEND_PORT=4200
+   ```
+2. Iniciar los servicios con Docker Compose:
+   ```bash
+   docker compose up -d
+   ```
+3. Inicializar la base de datos (si es la primera vez que se monta el volumen):
+   ```bash
+   docker exec -i tecnomega_database /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "S3guro!2025" -C -I < database/scripts/02_schema_and_data.sql
+   ```
 
-Para ejecutar el proyecto con Docker se necesita:
+## 5. Documentación Interactiva
 
-- Git.
-- Docker Desktop con Docker Compose.
-- Acceso al repositorio Git del proyecto.
+- **Swagger UI (Pruebas interactivas):** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **OpenAPI Schema:** [http://localhost:8000/openapi.json](http://localhost:8000/openapi.json)
 
-Los puertos utilizados por la configuración actual son:
+## 6. Endpoints de la API
 
-| Servicio | Puerto |
-|---|---:|
-| Backend | 8000 |
-| SQL Server | 1433 |
-| Frontend | 4200 |
-
-Los puertos deben estar disponibles en el equipo.
-
-## 5. Clonar y configurar el proyecto
-
-Clonar el repositorio y entrar en la carpeta del proyecto:
-
-```bash
-git clone https://github.com/StalinPaguay/Sistema_gestion_comercial.git
-```
-
-Crear el archivo local de variables de entorno:
-
-```bash
-cp .env.example .env
-```
-
-Editar `.env` y establecer una contraseña válida para SQL Server, junto con las demás variables requeridas.
-
-Variables previstas en `.env`:
-
-```dotenv
-MSSQL_SA_PASSWORD=CAMBIAR_POR_UNA_CONTRASENA_SEGURA
-MSSQL_DATABASE=TECNOMEGA
-MSSQL_PID=Developer
-BACKEND_PORT=8000
-FRONTEND_PORT=4200
-```
-
-Estos valores son una plantilla, no credenciales listas para producción. La contraseña real no debe compartirse ni subirse al repositorio.
-
-**Nota:** la configuración actual de `docker-compose.yml` publica los puertos 8000, 1433 y 4200 de forma fija. Las variables `BACKEND_PORT` y `FRONTEND_PORT` no cambian esos puertos hasta que el archivo Compose se adapte para utilizarlas.
-
-## 6. Construir e iniciar los servicios
-
-Desde la raíz del repositorio, construir la imagen del backend:
-
-```bash
-docker compose build backend
-```
-
-Iniciar los servicios:
-
-```bash
-docker compose up -d
-```
-
-Consultar el estado:
-
-```bash
-docker compose ps
-```
-
-Consultar los registros del backend:
-
-```bash
-docker compose logs --tail=100 backend
-```
-
-Si se modifican las dependencias o el código incorporado a la imagen, reconstruir el backend y reiniciarlo:
-
-```bash
-docker compose build backend
-docker compose up -d backend
-```
-
-## 7. Comprobar el funcionamiento
-
-Comprobar la conexión del backend a la base de datos:
-
-```bash
-curl -i http://localhost:8000/database
-```
-
-La respuesta esperada, cuando la conexión funciona, es HTTP 200 con un JSON similar a:
-
-```json
-{
-  "base_de_datos": "TECNOMEGA"
-}
-```
-
-Consultar los catálogos:
-
-```bash
-curl -i http://localhost:8000/productos
-curl -i http://localhost:8000/categorias
-curl -i http://localhost:8000/marcas
-```
-
-Abrir la documentación interactiva de FastAPI:
-
-- Swagger UI: http://localhost:8000/docs
-- OpenAPI JSON: http://localhost:8000/openapi.json
-
-La documentación interactiva permite inspeccionar las rutas y sus esquemas.
-
-## 8. Endpoints disponibles
-
-### Comprobación
-
+### Autenticación y Perfil (`/auth`)
 | Método | Ruta | Descripción |
 |---|---|---|
-| GET | `/` | Mensaje de estado de la API |
-| GET | `/database` | Nombre de la base de datos conectada |
+| POST | `/auth/login` | Inicia sesión con Email y Password, devuelve JWT |
+| POST | `/auth/register` | Registra nueva persona, usuario y cliente |
+| GET | `/auth/me` | Obtiene el perfil del usuario autenticado (Bearer Token) |
 
-### Productos
-
-| Método | Ruta | Operación |
+### Catálogo Comercial
+| Método | Ruta | Descripción |
 |---|---|---|
-| GET | `/productos` | Consultar productos |
-| POST | `/productos` | Crear un producto |
-| GET | `/productos/{producto_id}` | Consultar un producto por ID |
-| PATCH | `/productos/{producto_id}` | Actualizar parcialmente un producto |
-| DELETE | `/productos/{producto_id}` | Desactivar un producto |
+| GET / POST | `/productos` | Listado paginado y creación de productos |
+| GET / PATCH / DELETE | `/productos/{id}` | Detalle, edición parcial y baja lógica |
+| GET / POST | `/categorias` | Listado y creación de categorías |
+| GET / PATCH / DELETE | `/categorias/{id}` | Detalle, edición y baja lógica |
+| GET / POST | `/marcas` | Listado y creación de marcas |
+| GET / PATCH / DELETE | `/marcas/{id}` | Detalle, edición y baja lógica |
 
-La consulta de productos admite los parámetros de paginación `limite` y `desde`.
-
-### Categorías
-
-| Método | Ruta | Operación |
+### Clientes y Direcciones (`/clientes`)
+| Método | Ruta | Descripción |
 |---|---|---|
-| GET | `/categorias` | Consultar categorías |
-| POST | `/categorias` | Crear una categoría |
-| GET | `/categorias/{categoria_id}` | Consultar una categoría por ID |
-| PATCH | `/categorias/{categoria_id}` | Actualizar parcialmente una categoría |
-| DELETE | `/categorias/{categoria_id}` | Desactivar una categoría |
+| GET / POST | `/clientes` | Listado paginado y creación de clientes |
+| GET / PATCH | `/clientes/{id}` | Detalle y actualización de cliente |
+| GET / POST | `/clientes/{id}/direcciones` | Listar y agregar direcciones a un cliente |
+| PATCH / DELETE | `/clientes/direcciones/{dir_id}` | Actualizar o desactivar dirección |
 
-### Marcas
-
-| Método | Ruta | Operación |
+### Carrito de Compras (`/carrito`)
+| Método | Ruta | Descripción |
 |---|---|---|
-| GET | `/marcas` | Consultar marcas |
-| POST | `/marcas` | Crear una marca |
-| GET | `/marcas/{marca_id}` | Consultar una marca por ID |
-| PATCH | `/marcas/{marca_id}` | Actualizar parcialmente una marca |
-| DELETE | `/marcas/{marca_id}` | Desactivar una marca |
+| GET | `/carrito` | Consulta el carrito activo del usuario con totales |
+| POST | `/carrito/items` | Agrega un producto al carrito (valida stock) |
+| PATCH | `/carrito/items/{id}` | Modifica la cantidad de un item |
+| DELETE | `/carrito/items/{id}` | Quita un item del carrito |
+| DELETE | `/carrito` | Vacía el carrito |
 
-Las operaciones POST, PATCH y DELETE deben probarse en una base de datos de pruebas aislada antes de considerarse validadas.
+### Pedidos (`/pedidos`)
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/pedidos` | Listar pedidos (filtrable por cliente y estado) |
+| GET | `/pedidos/{id}` | Detalle completo de pedido con sus items |
+| POST | `/pedidos` | Crea pedido desde el carrito o items explícitos |
+| PATCH | `/pedidos/{id}/estado` | Actualiza estado (`Pendiente`, `Procesando`, etc.) |
 
-## 9. Base de datos y seguridad
+### Facturación y Pagos
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/facturas` | Listado de facturas |
+| GET | `/facturas/{id}` | Detalle de factura con desglose de items y totales |
+| POST | `/facturas` | Emite factura formal a partir de un pedido |
+| PATCH | `/facturas/{id}/anular` | Anula una factura emitida |
+| GET | `/metodos-pago` | Consulta formas de pago activas |
+| POST | `/pagos` | Registra el pago de un pedido |
+| GET | `/pagos/pedido/{id}` | Consulta pagos asociados a un pedido |
 
-El backend utiliza SQL Server y obtiene sus credenciales de variables de entorno.
+### Inventario y Proveedores
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/inventario/tipos-movimiento` | Tipos (Entrada, Salida, Ajuste) |
+| GET / POST | `/inventario/movimientos` | Historial y registro de movimiento de stock |
+| GET | `/inventario/stock-bajo` | Alertas de productos bajo el stock mínimo |
+| GET / POST | `/proveedores` | Listado y registro de proveedores |
+| GET / PATCH / DELETE | `/proveedores/{id}` | Detalle, actualización y baja lógica |
 
-La configuración actual conecta con el host `database`, nombre del servicio SQL Server dentro de la red de Docker Compose. Ejecutar el backend directamente en Windows, fuera de Docker, requiere adaptar la configuración del host y preparar el entorno de Python.
+## 7. Ejecución de Pruebas Automatizadas
 
-La configuración actual utiliza cifrado y `TrustServerCertificate=yes`. Esta opción es apropiada para ciertos entornos locales de desarrollo, pero en producción se debe validar correctamente el certificado del servidor.
+Para ejecutar la suite de pruebas unitarias y de integración dentro del contenedor:
 
-**Precauciones importantes:**
-
-- No subir `.env` al repositorio.
-- No publicar contraseñas, tokens ni credenciales en capturas o registros.
-- No ejecutar scripts de inicialización sobre una base de datos que contenga información que se deba conservar.
-- No utilizar `Base.metadata.create_all()` para modificar la base de datos existente.
-- No eliminar el volumen `sqlserver_data`.
-- No ejecutar `docker compose down -v` en el entorno con datos que deban conservarse.
-- Antes de realizar cambios de esquema, preparar y validar un procedimiento de migración y respaldo.
-
-Los scripts SQL están en `database/scripts/`. Deben revisarse antes de utilizarlos y no deben considerarse automáticamente migraciones seguras para una base existente.
-
-## 10. Estado de validación
-
-En el entorno de desarrollo original se verificó:
-
-- Construcción de la imagen Docker del backend.
-- Inicio de los contenedores.
-- Compilación de los módulos Python.
-- Conexión a la base de datos `TECNOMEGA`.
-- Respuestas HTTP 200 de `GET /database`, `GET /productos`, `GET /categorias` y `GET /marcas`.
-- Consulta de 8 productos, 6 categorías y 5 marcas durante las comprobaciones realizadas.
-
-Estas verificaciones corresponden al entorno actual; no demuestran todavía una instalación limpia en otro equipo.
-
-No se encontraron archivos de pruebas automatizadas en el backend durante la revisión. Las operaciones de escritura tampoco se han validado contra una base de pruebas aislada.
-
-## 11. Pendientes para continuar el desarrollo
-
-1. Ejecutar el proyecto desde un clon limpio en otro equipo.
-2. Preparar una base de datos de pruebas aislada para las operaciones de escritura.
-3. Incorporar pruebas automatizadas para los endpoints.
-4. Revisar los modelos y las relaciones del resto de las entidades.
-5. Documentar y validar el procedimiento de inicialización o migración de la base de datos.
-6. Confirmar las reglas de negocio de validación y desactivación de productos, categorías y marcas.
-7. Revisar la configuración de producción antes de desplegar el servicio.
-
----
-
-**Estado de la entrega:** el backend funciona en el entorno Docker actual y las consultas principales han sido verificadas. La entrega debe considerarse pendiente de las pruebas de escritura aisladas, la validación desde un clon limpio y la revisión final del repositorio.
+```bash
+docker exec tecnomega_backend python -m pytest tests/test_api.py -v
+```

@@ -1,69 +1,59 @@
 # ============================================================
-# MODELO DE CLIENTES
+# MODELO DE CLIENTES - TECNOMEGA
 # ============================================================
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from config.database import Base
+from models.persona import Persona
 
-
-# ============================================================
-# CLASE CLIENTE
-# ============================================================
 
 class Cliente(Base):
-    # Nombre de la tabla en SQL Server
+    """
+    Representa un cliente comercial en el sistema,
+    vinculado a una Persona física con su identificación única.
+    """
+
     __tablename__ = "Clientes"
 
-    # Identificador único del cliente
     ClienteId: Mapped[int] = mapped_column(
         Integer,
         primary_key=True,
-        autoincrement=True
+        autoincrement=True,
+        comment="Identificador único del cliente",
     )
 
-    # Número de identificación del cliente
+    PersonaId: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("Personas.PersonaId"),
+        nullable=False,
+        unique=True,
+        comment="Identificador de los datos personales",
+    )
+
     Identificacion: Mapped[str] = mapped_column(
         String(20),
         unique=True,
-        nullable=False
+        nullable=False,
+        comment="Cédula, RUC o pasaporte del cliente",
     )
 
-    # Nombres del cliente
-    Nombres: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False
-    )
-
-    # Apellidos del cliente
-    Apellidos: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False
-    )
-
-    # Número telefónico del cliente
-    Telefono: Mapped[str | None] = mapped_column(
-        String(20),
-        nullable=True
-    )
-
-    # Correo electrónico del cliente
-    Email: Mapped[str | None] = mapped_column(
-        String(150),
-        nullable=True
-    )
-
-    # Estado del cliente
     Estado: Mapped[bool] = mapped_column(
         Boolean,
-        nullable=False
+        default=True,
+        nullable=False,
+        comment="Indica si el cliente está activo",
     )
 
-    # Fecha de registro del cliente
     FechaRegistro: Mapped[datetime] = mapped_column(
         DateTime,
-        nullable=False
+        default=datetime.utcnow,
+        nullable=False,
+        comment="Fecha y hora de registro",
     )
+
+    # Relación ORM
+    Persona: Mapped["Persona"] = relationship("Persona")

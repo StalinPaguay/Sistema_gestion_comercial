@@ -64,13 +64,14 @@ from models.movimiento_inventario import MovimientoInventario
 # REGISTRO DEL MODELO DE CARRITO
 # ============================================================
 
+from models.persona import Persona
 from models.carrito import Carrito
 
 # ============================================================
 # REGISTRO DEL MODELO DE DETALLE DEL CARRITO
 # ============================================================
 
-from models.carrito_detalle import CarritoDetalle
+from models.carrito_detalle import DetalleCarrito
 
 # ============================================================
 # REGISTRO DEL MODELO DE MÉTODOS DE PAGO

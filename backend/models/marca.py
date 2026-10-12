@@ -30,6 +30,12 @@ class Marca(Base):
         nullable=False
     )
 
+    # Descripcion de la marca
+    Descripcion: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True
+    )
+
     # Estado de la marca
     Estado: Mapped[bool] = mapped_column(
         Boolean,

@@ -1,51 +1,37 @@
 # ============================================================
-# MODELO DE CARRITO
+# MODELO DE CARRITO - TECNOMEGA
 # ============================================================
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from config.database import Base
-from models.usuario import Usuario
+from models.cliente import Cliente
 
-
-# ============================================================
-# CLASE CARRITO
-# ============================================================
 
 class Carrito(Base):
-    # Nombre de la tabla en SQL Server
     __tablename__ = "Carrito"
 
-    # Identificador único del carrito
     CarritoId: Mapped[int] = mapped_column(
         Integer,
         primary_key=True,
-        autoincrement=True
+        autoincrement=True,
     )
 
-    # Identificador del usuario propietario del carrito
-    UsuarioId: Mapped[int] = mapped_column(
-        ForeignKey("Usuarios.UsuarioId"),
-        nullable=False
+    ClienteId: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("Clientes.ClienteId"),
+        unique=True,
+        nullable=False,
     )
 
-    # Relación con el modelo de usuarios
-    Usuario: Mapped["Usuario"] = relationship(
-        "Usuario"
-    )
-
-    # Fecha de creación del carrito
-    FechaCreacion: Mapped[datetime] = mapped_column(
+    FechaActualizacion: Mapped[datetime] = mapped_column(
         DateTime,
-        nullable=False
+        default=datetime.utcnow,
+        nullable=False,
     )
 
-    # Estado actual del carrito
-    Estado: Mapped[str] = mapped_column(
-        String(20),
-        nullable=False
-    )
-    
+    Cliente: Mapped["Cliente"] = relationship("Cliente")
+    Detalles: Mapped[list["DetalleCarrito"]] = relationship("DetalleCarrito", back_populates="Carrito", cascade="all, delete-orphan")

@@ -81,10 +81,24 @@ DATABASE_URL = URL.create(
 #
 # Este proceso no crea tablas ni modifica registros.
 
+from sqlalchemy import event
+
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
 )
+
+
+@event.listens_for(engine, "connect")
+def configurar_conexion_sqlserver(dbapi_connection, connection_record):
+    """
+    Configura QUOTED_IDENTIFIER y ANSI_NULLS en ON para cada conexión física.
+    Requerido por SQL Server para operar sobre tablas con índices filtrados o vistas indexadas.
+    """
+    cursor = dbapi_connection.cursor()
+    cursor.execute("SET QUOTED_IDENTIFIER ON;")
+    cursor.execute("SET ANSI_NULLS ON;")
+    cursor.close()
 
 
 # ============================================================
@@ -100,7 +114,9 @@ engine = create_engine(
 class Base(DeclarativeBase):
     """Clase base común para los modelos ORM de TECNOMEGA."""
 
-    pass
+    # Deshabilita la cláusula OUTPUT en INSERT/UPDATE para permitir
+    # compatibilidad con tablas que tienen triggers en SQL Server.
+    __table_args__ = {"implicit_returning": False}
 
 
 # ============================================================
