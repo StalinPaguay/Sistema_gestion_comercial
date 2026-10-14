@@ -96,6 +96,72 @@ def test_registro_nuevo_cliente_y_login():
     assert me_res.json()["Rol"] == "Cliente"
 
 
+def test_cambiar_password_flujo_completo():
+    """Valida el cambio seguro de contraseña, rechazo de errores y login posterior."""
+    unique_suffix = uuid.uuid4().hex[:6]
+    test_email = f"pwd_user_{unique_suffix}@tecnomega.com"
+    clave_original = "PasswordOriginal123!"
+    clave_nueva = "PasswordNueva456!"
+
+    # 1. Registrar usuario de prueba
+    reg_res = client.post("/auth/register", json={
+        "Nombres": "Usuario",
+        "Apellidos": "Password",
+        "Email": test_email,
+        "Password": clave_original,
+        "Identificacion": f"08{uuid.uuid4().int % 100000000:08d}",
+    })
+    assert reg_res.status_code == 201
+    token = reg_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 2. Sin token -> 401 Unauthorized
+    res_no_auth = client.patch("/auth/cambiar-password", json={
+        "currentPassword": clave_original,
+        "newPassword": clave_nueva,
+    })
+    assert res_no_auth.status_code == 401
+
+    # 3. Contraseña actual incorrecta -> 400 Bad Request
+    res_bad_current = client.patch("/auth/cambiar-password", headers=headers, json={
+        "currentPassword": "ClaveIncorrecta!",
+        "newPassword": clave_nueva,
+    })
+    assert res_bad_current.status_code == 400
+    assert "actual no es correcta" in res_bad_current.json()["detail"]
+
+    # 4. Misma contraseña -> 400 Bad Request
+    res_same = client.patch("/auth/cambiar-password", headers=headers, json={
+        "currentPassword": clave_original,
+        "newPassword": clave_original,
+    })
+    assert res_same.status_code == 400
+    assert "diferente" in res_same.json()["detail"] or "idéntica" in res_same.json()["detail"]
+
+    # 5. Cambio exitoso utilizando camelCase (lo que envía el frontend Angular)
+    res_ok = client.patch("/auth/cambiar-password", headers=headers, json={
+        "currentPassword": clave_original,
+        "newPassword": clave_nueva,
+    })
+    assert res_ok.status_code == 200
+    assert "exitosa" in res_ok.json()["message"]
+
+    # 6. Validar que la clave antigua ya NO funciona
+    res_login_old = client.post("/auth/login", json={
+        "Email": test_email,
+        "Password": clave_original,
+    })
+    assert res_login_old.status_code == 401
+
+    # 7. Validar que la nueva clave SÍ funciona
+    res_login_new = client.post("/auth/login", json={
+        "Email": test_email,
+        "Password": clave_nueva,
+    })
+    assert res_login_new.status_code == 200
+    assert "access_token" in res_login_new.json()
+
+
 # ------------------------------------------------------------
 # 3. CATÁLOGO COMERCIAL: PERMISOS Y PROTECCIÓN RBAC
 # ------------------------------------------------------------

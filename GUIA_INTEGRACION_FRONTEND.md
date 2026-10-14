@@ -172,6 +172,25 @@ El backend utiliza tokens de acceso **JWT (Bearer Tokens)** con expiración de 2
 - **Protegido**: Sí (Cualquier usuario autenticado).
 - **Respuesta `200 OK`**: Devuelve los datos del perfil actual.
 
+#### `PATCH /auth/cambiar-password` (o `POST /auth/cambiar-password`)
+- **Protegido**: Sí (`Authorization: Bearer <token>`).
+- **Body**: (Acepta camelCase o PascalCase)
+  ```json
+  {
+    "currentPassword": "MiPasswordActual123!",
+    "newPassword": "MiNuevaPasswordSegura456!"
+  }
+  ```
+- **Respuesta `200 OK`**:
+  ```json
+  {
+    "message": "Contraseña actualizada exitosamente."
+  }
+  ```
+- **Posibles errores**:
+  - `400 Bad Request`: Si la contraseña actual es errónea o si la nueva es idéntica a la actual.
+  - `401 Unauthorized`: Si falta el token de autorización o expiró.
+
 ---
 
 ### 4.2. Módulo: Catálogo Comercial (`/productos`, `/categorias`, `/marcas`)

@@ -27,7 +27,7 @@ Todos los módulos del backend pendientes para el sistema TECNOMEGA fueron compl
 - **Servicio:** `backend/services/auth_service.py` y `backend/routes/auth_routes.py`.
 - Emisión de tokens de acceso JWT (firmados con algoritmo HS256, expiración de 24 horas).
 - Hasheo seguro de contraseñas mediante **bcrypt** con salting.
-- Endpoints: `POST /auth/login`, `POST /auth/register` y `GET /auth/me`.
+- Endpoints: `POST /auth/login`, `POST /auth/register`, `GET /auth/me` y `PATCH /auth/cambiar-password`.
 - Dependencias RBAC: `get_current_user` y `require_admin`. Protección de operaciones de escritura en catálogo, inventario y proveedores.
 
 ### 2.2. Clientes y Direcciones de Entrega
@@ -102,7 +102,7 @@ Todos los módulos del backend pendientes para el sistema TECNOMEGA fueron compl
 
 ## 4. Pruebas Realizadas y Resultados
 
-Las 13 comprobaciones de integración ejecutadas con `pytest` pasaron al 100%:
+Las 14 comprobaciones de integración ejecutadas con `pytest` pasaron al 100%:
 
 | Prueba | Invocación | Resultado Verificado |
 | :--- | :--- | :--- |
@@ -111,6 +111,7 @@ Las 13 comprobaciones de integración ejecutadas con `pytest` pasaron al 100%:
 | `test_autenticacion_login_y_me` | `POST /auth/login` ➜ `GET /auth/me` | **HTTP 200** - JWT emitido y rol Administrador |
 | `test_login_credenciales_invalidas` | `POST /auth/login` (clave errónea) | **HTTP 401** - Unauthorized |
 | `test_registro_nuevo_cliente_y_login` | `POST /auth/register` ➜ `POST /login` | **HTTP 201** y **200** - Registro completo de cliente |
+| `test_cambiar_password_flujo_completo` | `PATCH /auth/cambiar-password` | **HTTP 200** - Actualización segura y login verificado |
 | `test_catalogo_lectura_publica` | `GET /productos`, `/categorias`, `/marcas` | **HTTP 200** - Consulta paginada pública |
 | `test_catalogo_proteccion_escritura_rbac` | `POST /productos` (sin token / con rol Cliente) | **HTTP 401** y **HTTP 403** - Protección RBAC efectiva |
 | `test_direcciones_cliente_crud` | `POST` y `GET /clientes/me/direcciones` | **HTTP 201** y **200** - Creación y consulta de direcciones |

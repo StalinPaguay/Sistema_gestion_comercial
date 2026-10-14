@@ -5,7 +5,7 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import AliasChoices, BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
 from config.database import get_db
@@ -45,6 +45,19 @@ class RegistroEntrada(BaseModel):
         default=None,
         max_length=20,
         description="Identificación fiscal (cédula o RUC) para crearlo como cliente",
+    )
+
+
+class CambiarPasswordEntrada(BaseModel):
+    PasswordActual: str = Field(
+        min_length=4,
+        description="Contraseña actual de la cuenta",
+        validation_alias=AliasChoices("PasswordActual", "currentPassword", "passwordActual"),
+    )
+    PasswordNuevo: str = Field(
+        min_length=6,
+        description="Nueva contraseña segura",
+        validation_alias=AliasChoices("PasswordNuevo", "newPassword", "passwordNuevo"),
     )
 
 
@@ -255,3 +268,51 @@ def perfil_usuario(
         "FechaRegistro": usuario.FechaRegistro.isoformat() if usuario.FechaRegistro else None,
         "Estado": usuario.Estado,
     }
+
+
+@router.patch(
+    "/cambiar-password",
+    summary="Actualizar contraseña del usuario autenticado",
+)
+@router.post(
+    "/cambiar-password",
+    summary="Actualizar contraseña del usuario autenticado",
+)
+@router.patch(
+    "/password",
+    summary="Actualizar contraseña del usuario autenticado (alias)",
+)
+def cambiar_password(
+    datos: CambiarPasswordEntrada,
+    usuario: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Permite al usuario autenticado modificar su contraseña.
+    Valida la contraseña actual, comprueba que la nueva sea diferente y aplica hash seguro bcrypt.
+    """
+    # 1. Validar contraseña actual contra hash almacenado
+    if not verify_password(datos.PasswordActual, usuario.PasswordHash):
+        # Compatibilidad con contraseña semilla inicial si aplica
+        if not (datos.PasswordActual in ("Admin123!", "S3guro!2025") and usuario.PasswordHash == datos.PasswordActual):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La contraseña actual no es correcta.",
+            )
+
+    # 2. Validar que la nueva contraseña no sea idéntica a la actual
+    if datos.PasswordActual == datos.PasswordNuevo:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La nueva contraseña no puede ser idéntica a la contraseña actual.",
+        )
+
+    # 3. Hashear nueva contraseña con bcrypt y persistir
+    usuario.PasswordHash = hash_password(datos.PasswordNuevo)
+    db.commit()
+
+    return {
+        "mensaje": "Contraseña actualizada exitosamente.",
+        "message": "Contraseña actualizada exitosamente.",
+    }
+
