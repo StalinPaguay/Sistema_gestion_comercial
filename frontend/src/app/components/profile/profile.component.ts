@@ -78,6 +78,7 @@ export class ProfileComponent implements OnInit {
       Apellidos: String(form.value['Apellidos']).trim(),
       Email: String(form.value['Email']).trim(),
       Telefono: String(form.value['Telefono'] ?? '').trim() || null,
+      Identificacion: String(form.value['Identificacion'] ?? '').trim() || null,
     };
     this.errorMessage.set('');
     this.successMessage.set('');
@@ -180,9 +181,7 @@ export class ProfileComponent implements OnInit {
     request.subscribe({
       next: (address) => {
         this.addresses.update((current) => {
-          const withoutUpdated = current.filter(
-            (item) => item.DireccionId !== address.DireccionId,
-          );
+          const withoutUpdated = current.filter((item) => item.DireccionId !== address.DireccionId);
           const normalized = address.EsPrincipal
             ? withoutUpdated.map((item) => ({ ...item, EsPrincipal: false }))
             : withoutUpdated;
@@ -210,24 +209,22 @@ export class ProfileComponent implements OnInit {
 
     this.errorMessage.set('');
     this.successMessage.set('');
-    this.userService
-      .updateAddress(address.DireccionId, { EsPrincipal: true })
-      .subscribe({
-        next: (updated) => {
-          this.addresses.update((current) =>
-            current.map((item) => ({
-              ...item,
-              EsPrincipal: item.DireccionId === updated.DireccionId,
-            })),
-          );
-          this.successMessage.set('La dirección principal se actualizó.');
-        },
-        error: (error: unknown) => {
-          this.errorMessage.set(
-            this.requestError(error, 'No se pudo cambiar la dirección principal.'),
-          );
-        },
-      });
+    this.userService.updateAddress(address.DireccionId, { EsPrincipal: true }).subscribe({
+      next: (updated) => {
+        this.addresses.update((current) =>
+          current.map((item) => ({
+            ...item,
+            EsPrincipal: item.DireccionId === updated.DireccionId,
+          })),
+        );
+        this.successMessage.set('La dirección principal se actualizó.');
+      },
+      error: (error: unknown) => {
+        this.errorMessage.set(
+          this.requestError(error, 'No se pudo cambiar la dirección principal.'),
+        );
+      },
+    });
   }
 
   protected deleteAddress(address: DeliveryAddress): void {

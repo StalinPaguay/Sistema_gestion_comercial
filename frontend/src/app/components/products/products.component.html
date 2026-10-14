@@ -1,11 +1,11 @@
 <div class="products-container">
   <div class="main-layout">
     <aside class="sidebar-wrapper">
-      <div class="side-card">
+      <div class="side-card sidebar-ad">
         <img [src]="banners[nextIndex]" alt="Publicidad TECNOMEGA" class="banner-img" />
       </div>
 
-      <div class="sidebar">
+      <div class="sidebar" role="group" aria-label="Filtros de productos">
         <div class="filter-group">
           <div class="filter-heading">
             <h3 class="filter-title">Categoría</h3>
@@ -40,7 +40,9 @@
               Limpiar
             </button>
           </div>
-          <p class="price-limit">Hasta: <strong>{{ selectedMaxPrice | currency: 'USD' }}</strong></p>
+          <p class="price-limit">
+            Hasta: <strong>{{ selectedMaxPrice | currency: 'USD' }}</strong>
+          </p>
           <input
             class="price-slider"
             type="range"
@@ -48,7 +50,7 @@
             [max]="maximumAvailablePrice"
             step="1"
             [value]="selectedMaxPrice"
-            [style.--range-progress]="(selectedMaxPrice / maximumAvailablePrice * 100) + '%'"
+            [style.--range-progress]="(selectedMaxPrice / maximumAvailablePrice) * 100 + '%'"
             [attr.aria-valuetext]="'Hasta ' + (selectedMaxPrice | currency: 'USD')"
             aria-label="Precio máximo"
             (input)="updateMaxPrice($event)"
@@ -99,7 +101,12 @@
           class="all-filters-reset"
           type="button"
           (click)="resetFilters()"
-          [disabled]="!selectedCategories.length && !selectedCategory && selectedMaxPrice >= maximumAvailablePrice && !selectedMinimumRating"
+          [disabled]="
+            !selectedCategories.length &&
+            !selectedCategory &&
+            selectedMaxPrice >= maximumAvailablePrice &&
+            !selectedMinimumRating
+          "
         >
           Limpiar todos los filtros
         </button>
@@ -127,7 +134,7 @@
           <mat-icon>chevron_right</mat-icon>
         </button>
         <div class="hero-action">
-          <a class="btn-orange" href="#productos">Comprar ahora</a>
+          <a class="btn-orange" href="#productos">🔥 ¡Ver descuentos exclusivos!</a>
         </div>
         <div class="slider-dots" aria-label="Seleccionar publicidad">
           <button
@@ -199,21 +206,31 @@
                 <h3 class="product-title">{{ item.nombre }}</h3>
                 <p class="product-description">{{ item.descripcion }}</p>
                 <div class="product-rating" [attr.aria-label]="'Calificación de ' + item.nombre">
-                  <ng-container *ngIf="ratingSummaries[item.productoId] as rating; else ratingLoading">
+                  <ng-container
+                    *ngIf="ratingSummaries[item.productoId] as rating; else ratingLoading"
+                  >
                     <span class="rating-stars" aria-hidden="true">
                       <span
                         *ngFor="let star of ratingStars"
                         [class.filled]="isStarFilled(rating.CalificacionPromedio, star)"
-                      >★</span>
+                        >★</span
+                      >
                     </span>
-                    <span class="rating-value">{{ rating.CalificacionPromedio | number: '1.1-1' }}</span>
+                    <span class="rating-value">{{
+                      rating.CalificacionPromedio | number: '1.1-1'
+                    }}</span>
                     <span class="rating-count">({{ rating.TotalResenas }})</span>
                   </ng-container>
                   <ng-template #ratingLoading>
-                    <span *ngIf="ratingSummaries[item.productoId] === null; else loadingRating" class="rating-unavailable">
+                    <span
+                      *ngIf="ratingSummaries[item.productoId] === null; else loadingRating"
+                      class="rating-unavailable"
+                    >
                       Reseñas no disponibles
                     </span>
-                    <ng-template #loadingRating><span class="rating-loading">Cargando reseñas...</span></ng-template>
+                    <ng-template #loadingRating
+                      ><span class="rating-loading">Cargando reseñas...</span></ng-template
+                    >
                   </ng-template>
                 </div>
                 <p class="product-price">{{ item.precio | currency: 'USD' }}</p>
@@ -244,7 +261,10 @@
                 <svg viewBox="0 0 64 64">
                   <circle cx="27" cy="27" r="16"></circle>
                   <path d="m39 39 13 13"></path>
-                  <path class="empty-state-star" d="m27 17 2.8 6.2 6.7.8-4.9 4.7 1.2 6.7-5.8-3.3-5.8 3.3 1.2-6.7-4.9-4.7 6.7-.8z"></path>
+                  <path
+                    class="empty-state-star"
+                    d="m27 17 2.8 6.2 6.7.8-4.9 4.7 1.2 6.7-5.8-3.3-5.8 3.3 1.2-6.7-4.9-4.7 6.7-.8z"
+                  ></path>
                 </svg>
               </div>
               <h3>{{ emptyStateTitle }}</h3>
@@ -281,22 +301,29 @@
       aria-labelledby="detail-title"
       (click)="$event.stopPropagation()"
     >
-      <button class="detail-close" type="button" aria-label="Cerrar detalle" (click)="closeDetails()">×</button>
+      <button
+        class="detail-close"
+        type="button"
+        aria-label="Cerrar detalle"
+        (click)="closeDetails()"
+      >
+        ×
+      </button>
       <div class="detail-product">
         <div class="detail-image">
-          <img
-            *ngIf="product.urlImagen"
-            [src]="product.urlImagen"
-            [alt]="product.nombre"
-          />
+          <img *ngIf="product.urlImagen" [src]="product.urlImagen" [alt]="product.nombre" />
         </div>
         <div class="detail-copy">
           <span class="detail-category">{{ product.categoria }}</span>
           <h2 id="detail-title">{{ product.nombre }}</h2>
           <p>{{ product.descripcion }}</p>
           <p class="detail-price">{{ product.precio | currency: 'USD' }}</p>
-          <p class="detail-stock">{{ product.stock > 0 ? 'Disponible' : 'Agotado' }} · SKU: {{ product.sku }}</p>
-          <div *ngIf="detailLoading" class="detail-status" role="status">Cargando información del producto...</div>
+          <p class="detail-stock">
+            {{ product.stock > 0 ? 'Disponible' : 'Agotado' }} · SKU: {{ product.sku }}
+          </p>
+          <div *ngIf="detailLoading" class="detail-status" role="status">
+            Cargando información del producto...
+          </div>
           <div *ngIf="detailWarning" class="detail-error" role="alert">{{ detailWarning }}</div>
           <button
             class="btn-add-cart detail-add-cart"
@@ -317,7 +344,8 @@
               <span
                 *ngFor="let star of ratingStars"
                 [class.filled]="isStarFilled(rating.CalificacionPromedio, star)"
-              >★</span>
+                >★</span
+              >
             </span>
             <strong>{{ rating.CalificacionPromedio | number: '1.1-1' }}</strong>
             <span class="rating-count">({{ rating.TotalResenas }} reseñas)</span>
@@ -326,7 +354,12 @@
 
         <form class="review-form" (ngSubmit)="submitReview()">
           <label class="review-label">Tu calificación</label>
-          <div class="interactive-stars" (mouseleave)="hoverRating = 0" role="group" aria-label="Seleccionar calificación">
+          <div
+            class="interactive-stars"
+            (mouseleave)="hoverRating = 0"
+            role="group"
+            aria-label="Seleccionar calificación"
+          >
             <button
               *ngFor="let star of ratingStars"
               type="button"
@@ -338,7 +371,9 @@
               (focus)="hoverRating = star"
               (blur)="hoverRating = 0"
               (click)="setRating(star)"
-            >★</button>
+            >
+              ★
+            </button>
           </div>
           <label class="review-label" for="review-comment">Comentario (opcional)</label>
           <textarea
@@ -358,19 +393,33 @@
 
         <div class="reviews-list" aria-live="polite">
           <p *ngIf="reviewLoading" class="detail-status">Cargando reseñas...</p>
-          <p *ngIf="!reviewLoading && selectedReviews.length === 0 && !reviewError" class="empty-reviews">
+          <p
+            *ngIf="!reviewLoading && selectedReviews.length === 0 && !reviewError"
+            class="empty-reviews"
+          >
             Este producto aún no tiene reseñas.
           </p>
-          <article *ngFor="let review of selectedReviews" class="review-item">
+          <article *ngFor="let review of visibleReviews" class="review-item">
             <div class="review-item-heading">
               <strong>{{ review.Usuario }}</strong>
-              <span class="review-item-stars" [attr.aria-label]="review.Calificacion + ' de 5 estrellas'">
+              <span
+                class="review-item-stars"
+                [attr.aria-label]="review.Calificacion + ' de 5 estrellas'"
+              >
                 {{ reviewStarString(review.Calificacion) }}
               </span>
             </div>
             <p *ngIf="review.Comentario">{{ review.Comentario }}</p>
             <time *ngIf="review.Fecha">{{ review.Fecha | date: 'mediumDate' }}</time>
           </article>
+          <button
+            *ngIf="selectedReviews.length > 5 && !reviewsExpanded"
+            class="show-more-reviews"
+            type="button"
+            (click)="reviewsExpanded = true"
+          >
+            Ver más reseñas
+          </button>
         </div>
       </div>
     </section>

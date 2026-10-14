@@ -54,10 +54,52 @@ form {
   margin-top: 22px;
 }
 
+.registration-success {
+  display: grid;
+  justify-items: center;
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid #a7f3d0;
+  border-radius: 14px;
+  color: #065f46;
+  background: #ecfdf5;
+  text-align: center;
+}
+
+.registration-success > svg {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: #fff;
+  background: #16a34a;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.registration-success h2 {
+  margin: 12px 0 6px;
+  color: #065f46;
+  font-size: 18px;
+}
+
+.registration-success p {
+  margin: 0;
+  color: #047857;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.success-login-button {
+  text-decoration: none;
+}
+
 .fields-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 15px 12px;
+  gap: 18px 14px;
 }
 
 .input-field {

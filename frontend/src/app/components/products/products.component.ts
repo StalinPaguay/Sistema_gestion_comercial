@@ -8,11 +8,7 @@ import { AuthService } from '../../services/auth.service';
 import { CartService } from '../../services/cart.service';
 import { FavoritesService } from '../../services/favorites.service';
 import { Product, ProductCategory, ProductService } from '../../services/product.service';
-import {
-  ProductReview,
-  ProductReviews,
-  ReviewService,
-} from '../../services/review.service';
+import { ProductReview, ProductReviews, ReviewService } from '../../services/review.service';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { CatalogNavigationService } from '../../services/catalog-navigation.service';
@@ -55,9 +51,6 @@ export class ProductsComponent implements OnInit, OnDestroy {
   ];
   products: Product[] = [];
   categories: ProductCategory[] = [];
-  selectedCategories: string[] = [];
-  selectedMaxPrice = 0;
-  selectedMinimumRating = 0;
   cartNotice = '';
   cartNoticeError = false;
   loading = true;
@@ -70,6 +63,7 @@ export class ProductsComponent implements OnInit, OnDestroy {
   cartAdding = false;
   ratingSummaries: Record<number, ProductReviews | null | undefined> = {};
   selectedReviews: ProductReview[] = [];
+  reviewsExpanded = false;
   selectedRating = 0;
   hoverRating = 0;
   reviewComment = '';
@@ -96,6 +90,30 @@ export class ProductsComponent implements OnInit, OnDestroy {
 
   set selectedCategory(category: string) {
     this.catalogNavigation.selectedCategory.set(category);
+  }
+
+  get selectedCategories(): string[] {
+    return this.catalogNavigation.selectedCategories();
+  }
+
+  set selectedCategories(categories: string[]) {
+    this.catalogNavigation.selectedCategories.set(categories);
+  }
+
+  get selectedMaxPrice(): number {
+    return this.catalogNavigation.selectedMaxPrice();
+  }
+
+  set selectedMaxPrice(price: number) {
+    this.catalogNavigation.selectedMaxPrice.set(price);
+  }
+
+  get selectedMinimumRating(): number {
+    return this.catalogNavigation.selectedMinimumRating();
+  }
+
+  set selectedMinimumRating(rating: number) {
+    this.catalogNavigation.selectedMinimumRating.set(rating);
   }
 
   get searchTerm(): string {
@@ -138,6 +156,10 @@ export class ProductsComponent implements OnInit, OnDestroy {
 
   get minimumRatingOptions(): number[] {
     return [4, 3, 2, 1];
+  }
+
+  get visibleReviews(): ProductReview[] {
+    return this.reviewsExpanded ? this.selectedReviews : this.selectedReviews.slice(0, 5);
   }
 
   get hasActiveFilters(): boolean {
@@ -188,9 +210,9 @@ export class ProductsComponent implements OnInit, OnDestroy {
         this.catalogNavigation.setCategories(categories.data);
         this.products = products.data.map((product) => ({
           ...product,
-          categoria:
-            product.categoria,
+          categoria: product.categoria,
         }));
+        this.catalogNavigation.maximumAvailablePrice.set(this.maximumAvailablePrice);
         this.selectedMaxPrice =
           this.selectedMaxPrice > 0
             ? Math.min(this.selectedMaxPrice, this.maximumAvailablePrice)
@@ -285,7 +307,12 @@ export class ProductsComponent implements OnInit, OnDestroy {
 
   confirmAddToCart(quantity: number): void {
     const product = this.cartProductToAdd;
-    if (!product || this.cartAdding || quantity < 1 || quantity > this.cartProductAvailableQuantity) {
+    if (
+      !product ||
+      this.cartAdding ||
+      quantity < 1 ||
+      quantity > this.cartProductAvailableQuantity
+    ) {
       return;
     }
 
@@ -363,6 +390,7 @@ export class ProductsComponent implements OnInit, OnDestroy {
     this.detailWarning = '';
     this.detailLoading = true;
     this.selectedReviews = [];
+    this.reviewsExpanded = false;
     this.selectedRating = 0;
     this.hoverRating = 0;
     this.reviewComment = '';
@@ -390,6 +418,7 @@ export class ProductsComponent implements OnInit, OnDestroy {
 
   closeDetails(): void {
     this.selectedProduct = null;
+    this.reviewsExpanded = false;
     this.detailWarning = '';
     this.reviewError = '';
     this.reviewMessage = '';
@@ -461,9 +490,7 @@ export class ProductsComponent implements OnInit, OnDestroy {
 
     forkJoin(
       products.map((product) =>
-        this.reviewService.getProductReviews(product.productoId).pipe(
-          catchError(() => of(null)),
-        ),
+        this.reviewService.getProductReviews(product.productoId).pipe(catchError(() => of(null))),
       ),
     ).subscribe((summaries) => {
       products.forEach((product, index) => {
@@ -506,7 +533,7 @@ export class ProductsComponent implements OnInit, OnDestroy {
 
   startAutoSlide(): void {
     this.stopAutoSlide();
-    this.autoSlideInterval = setInterval(() => this.nextSlide(), 5000);
+    this.autoSlideInterval = setInterval(() => this.nextSlide(), 3500);
   }
 
   stopAutoSlide(): void {

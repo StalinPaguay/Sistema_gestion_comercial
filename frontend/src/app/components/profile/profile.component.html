@@ -45,7 +45,13 @@
           </label>
           <label>
             <span>Apellidos</span>
-            <input name="Apellidos" [ngModel]="user.Apellidos" required minlength="2" maxlength="100" />
+            <input
+              name="Apellidos"
+              [ngModel]="user.Apellidos"
+              required
+              minlength="2"
+              maxlength="100"
+            />
           </label>
           <label>
             <span>Correo electrónico</span>
@@ -57,11 +63,7 @@
           </label>
           <label>
             <span>Identificación</span>
-            <input [value]="user.Identificacion ?? 'No disponible'" disabled />
-          </label>
-          <label>
-            <span>Tipo de cuenta</span>
-            <input [value]="user.Rol" disabled />
+            <input name="Identificacion" [ngModel]="user.Identificacion ?? ''" maxlength="30" />
           </label>
         </div>
         @if (user.ClienteId === null) {
@@ -69,7 +71,11 @@
             Tu usuario no tiene un perfil de cliente asociado. La edición requiere un ClienteId.
           </p>
         }
-        <button class="primary-button" type="submit" [disabled]="profileForm.invalid || savingProfile() || user.ClienteId === null">
+        <button
+          class="primary-button"
+          type="submit"
+          [disabled]="profileForm.invalid || savingProfile() || user.ClienteId === null"
+        >
           {{ savingProfile() ? 'Guardando...' : 'Guardar cambios' }}
         </button>
       </form>
@@ -167,7 +173,10 @@
                 }
               </div>
               <h3>{{ address.Direccion }}</h3>
-              <p>{{ address.Ciudad || 'Ciudad no indicada' }}{{ address.Provincia ? ', ' + address.Provincia : '' }}</p>
+              <p>
+                {{ address.Ciudad || 'Ciudad no indicada'
+                }}{{ address.Provincia ? ', ' + address.Provincia : '' }}
+              </p>
               @if (address.Referencia) {
                 <p class="address-secondary">Referencia: {{ address.Referencia }}</p>
               }
@@ -176,10 +185,16 @@
               }
               <div class="address-actions">
                 @if (!address.EsPrincipal) {
-                  <button class="text-button" type="button" (click)="makePrimary(address)">Marcar principal</button>
+                  <button class="text-button" type="button" (click)="makePrimary(address)">
+                    Marcar principal
+                  </button>
                 }
-                <button class="text-button" type="button" (click)="editAddress(address)">Editar</button>
-                <button class="danger-button" type="button" (click)="deleteAddress(address)">Eliminar</button>
+                <button class="text-button" type="button" (click)="editAddress(address)">
+                  Editar
+                </button>
+                <button class="danger-button" type="button" (click)="deleteAddress(address)">
+                  Eliminar
+                </button>
               </div>
             </article>
           }
@@ -195,7 +210,14 @@
               </h3>
               <p>Completa los datos de entrega.</p>
             </div>
-            <button class="icon-button" type="button" aria-label="Cerrar formulario" (click)="cancelAddressForm()">×</button>
+            <button
+              class="icon-button"
+              type="button"
+              aria-label="Cerrar formulario"
+              (click)="cancelAddressForm()"
+            >
+              ×
+            </button>
           </div>
           <form #addressFormRef="ngForm" (ngSubmit)="saveAddress(addressFormRef)">
             <div class="form-grid">
@@ -209,7 +231,13 @@
               </label>
               <label class="field-wide">
                 <span>Dirección</span>
-                <input name="Direccion" [ngModel]="addressForm().Direccion" required minlength="3" maxlength="250" />
+                <input
+                  name="Direccion"
+                  [ngModel]="addressForm().Direccion"
+                  required
+                  minlength="3"
+                  maxlength="250"
+                />
               </label>
               <label class="field-wide">
                 <span>Referencia</span>
@@ -225,8 +253,14 @@
               </label>
             </div>
             <div class="form-actions">
-              <button class="secondary-button" type="button" (click)="cancelAddressForm()">Cancelar</button>
-              <button class="primary-button" type="submit" [disabled]="addressFormRef.invalid || savingAddress()">
+              <button class="secondary-button" type="button" (click)="cancelAddressForm()">
+                Cancelar
+              </button>
+              <button
+                class="primary-button"
+                type="submit"
+                [disabled]="addressFormRef.invalid || savingAddress()"
+              >
                 {{ savingAddress() ? 'Guardando...' : 'Guardar dirección' }}
               </button>
             </div>

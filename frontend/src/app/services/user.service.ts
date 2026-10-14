@@ -24,6 +24,7 @@ export interface ProfileUpdate {
   Apellidos: string;
   Email: string;
   Telefono: string | null;
+  Identificacion: string | null;
 }
 
 export interface DeliveryAddress {
@@ -71,11 +72,9 @@ export class UserService {
   }
 
   createAddress(address: DeliveryAddressInput): Observable<DeliveryAddress> {
-    return this.http.post<DeliveryAddress>(
-      `${API_BASE_URL}/clientes/me/direcciones`,
-      address,
-      { headers: this.authHeaders() },
-    );
+    return this.http.post<DeliveryAddress>(`${API_BASE_URL}/clientes/me/direcciones`, address, {
+      headers: this.authHeaders(),
+    });
   }
 
   updateAddress(

@@ -103,7 +103,7 @@ h1 {
 }
 
 .profile-card {
-  padding: 24px;
+  padding: 32px;
 }
 
 .password-card {
@@ -156,14 +156,14 @@ h1 {
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 40px 28px;
 }
 
 .form-grid label {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 7px;
+  gap: 12px;
   color: var(--text-primary, #1e293b);
   font-size: 0.84rem;
   font-weight: 700;
@@ -171,7 +171,7 @@ h1 {
 
 .form-grid input:not([type='checkbox']) {
   width: 100%;
-  min-height: 44px;
+  min-height: 42px;
   padding: 0 12px;
   border: 1px solid var(--app-border, #cbd5e1);
   border-radius: 8px;
@@ -224,7 +224,7 @@ h1 {
 }
 
 .profile-card form > .primary-button {
-  margin-top: 20px;
+  margin-top: 24px;
 }
 
 .secondary-button {
@@ -346,7 +346,11 @@ h1 {
 
 .address-form-card {
   margin-top: 20px;
-  padding: 22px;
+  padding: 32px;
+}
+
+.address-form-card .form-grid {
+  row-gap: 40px;
 }
 
 .address-form-card .section-heading {
@@ -469,14 +473,22 @@ h1 {
   }
 }
 
+@media (max-width: 768px) {
+  .profile-card,
+  .address-form-card {
+    padding: 24px;
+  }
+}
+
 @media (max-width: 520px) {
   .profile-card,
   .address-form-card {
-    padding: 18px;
+    padding: 22px;
   }
 
   .form-grid {
     grid-template-columns: 1fr;
+    row-gap: 34px;
   }
 
   .field-wide {

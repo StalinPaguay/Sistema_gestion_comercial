@@ -1,26 +1,27 @@
-<header class="site-navbar">
-  <a class="brand" routerLink="/products" aria-label="TECNOMEGA, inicio">
-    <span>TECNO</span><span class="brand-orange">MEGA</span>
-  </a>
-
-  <nav class="category-links" aria-label="Categorías de productos">
+<header class="site-navbar" #navbarRoot>
+  <div class="navbar-brand-group">
     <a
-      href="#productos"
-      [class.active]="!catalogNavigation.selectedCategory()"
-      (click)="selectCategory(''); $event.preventDefault()"
+      class="brand"
+      routerLink="/products"
+      aria-label="TECNOMEGA, inicio"
+      (click)="closeMobileMenu()"
     >
-      Todos
+      <span>TECNO</span><span class="brand-orange">MEGA</span>
     </a>
-    @for (category of catalogNavigation.categories(); track category.id_categoria) {
-      <a
-        href="#productos"
-        [class.active]="catalogNavigation.selectedCategory() === category.nombre"
-        (click)="selectCategory(category.nombre); $event.preventDefault()"
-      >
-        {{ category.nombre }}
-      </a>
-    }
-  </nav>
+
+    <button
+      class="menu-toggle"
+      type="button"
+      [attr.aria-expanded]="mobileMenuOpen()"
+      aria-controls="navbar-panel"
+      [attr.aria-label]="mobileMenuOpen() ? 'Cerrar menú' : 'Abrir menú'"
+      (click)="toggleMobileMenu()"
+    >
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+        <path d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+  </div>
 
   <div class="nav-actions">
     <label class="search-control">
@@ -55,7 +56,9 @@
         </button>
         @if (accountMenuOpen()) {
           <section class="account-popover" id="account-popover" aria-label="Opciones de cuenta">
-            <a routerLink="/profile" (click)="accountMenuOpen.set(false)">Mi perfil</a>
+            <a routerLink="/profile" (click)="accountMenuOpen.set(false); closeMobileMenu()"
+              >Mi perfil</a
+            >
             <button type="button" (click)="logout()">Cerrar Sesión</button>
           </section>
         }
@@ -66,6 +69,7 @@
         routerLink="/login"
         aria-label="Iniciar sesión"
         title="Iniciar sesión"
+        (click)="closeMobileMenu()"
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="12" cy="8" r="3.5" />
@@ -77,7 +81,9 @@
     <button
       class="action-link theme-toggle"
       type="button"
-      [attr.aria-label]="themeService.theme() === 'light' ? 'Activar modo oscuro' : 'Activar modo claro'"
+      [attr.aria-label]="
+        themeService.theme() === 'light' ? 'Activar modo oscuro' : 'Activar modo claro'
+      "
       [attr.title]="themeService.theme() === 'light' ? 'Activar modo oscuro' : 'Activar modo claro'"
       (click)="toggleTheme()"
     >
@@ -88,7 +94,9 @@
       } @else {
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="12" cy="12" r="4" />
-          <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+          <path
+            d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
+          />
         </svg>
       }
     </button>
@@ -97,14 +105,18 @@
       <button
         class="action-link favorite-trigger"
         type="button"
-        [attr.aria-label]="'Favoritos guardados, ' + favoritesService.getFavoritesCount() + ' productos'"
+        [attr.aria-label]="
+          'Favoritos guardados, ' + favoritesService.getFavoritesCount() + ' productos'
+        "
         [attr.aria-expanded]="favoritesOpen()"
         aria-controls="favorites-popover"
         title="Favoritos guardados"
         (click)="toggleFavorites()"
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M20.8 8.7c0 5.2-8.8 11-8.8 11s-8.8-5.8-8.8-11A4.7 4.7 0 0 1 12 6a4.7 4.7 0 0 1 8.8 2.7Z" />
+          <path
+            d="M20.8 8.7c0 5.2-8.8 11-8.8 11s-8.8-5.8-8.8-11A4.7 4.7 0 0 1 12 6a4.7 4.7 0 0 1 8.8 2.7Z"
+          />
         </svg>
         @if (favoritesService.getFavoritesCount() > 0) {
           <span class="favorite-badge" aria-live="polite">
@@ -114,7 +126,11 @@
       </button>
 
       @if (favoritesOpen()) {
-        <section class="favorites-popover" id="favorites-popover" aria-label="Vista previa de favoritos">
+        <section
+          class="favorites-popover"
+          id="favorites-popover"
+          aria-label="Vista previa de favoritos"
+        >
           <header class="popover-header">
             <h2>Favoritos guardados</h2>
             <span>{{ favoritesService.getFavoritesCount() }}</span>
@@ -122,7 +138,10 @@
 
           @if (favoritesService.getFavoritesCount() > 0) {
             <ul class="popover-list">
-              @for (product of favoritesService.getFavorites().slice(0, 5); track product.productoId) {
+              @for (
+                product of favoritesService.getFavorites().slice(0, 5);
+                track product.productoId
+              ) {
                 <li class="popover-item">
                   <img [src]="product.urlImagen" [alt]="product.nombre" width="50" height="50" />
                   <div class="popover-product">
@@ -167,6 +186,7 @@
       routerLink="/cart"
       [attr.aria-label]="'Carrito, ' + cartService.count() + ' artículos'"
       title="Ver carrito"
+      (click)="closeMobileMenu()"
     >
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M3 4h2l2.2 11.2a2 2 0 0 0 2 1.6h8.6a2 2 0 0 0 1.9-1.4L22 8H6" />
@@ -177,5 +197,116 @@
         <span class="cart-badge" aria-live="polite">{{ cartService.count() }}</span>
       }
     </a>
+  </div>
+
+  <div class="navbar-panel" id="navbar-panel" [class.is-open]="mobileMenuOpen()">
+    <nav class="category-links" aria-label="Categorías de productos">
+      <a
+        href="#productos"
+        [class.active]="!catalogNavigation.selectedCategory()"
+        (click)="selectCategory(''); $event.preventDefault()"
+      >
+        Todos
+      </a>
+      @for (category of catalogNavigation.categories(); track category.id_categoria) {
+        <a
+          href="#productos"
+          [class.active]="catalogNavigation.selectedCategory() === category.nombre"
+          (click)="selectCategory(category.nombre); $event.preventDefault()"
+        >
+          {{ category.nombre }}
+        </a>
+      }
+    </nav>
+
+    <section class="mobile-filters" aria-label="Filtros del catálogo">
+      <h2>Filtrar productos</h2>
+      <details class="filter-accordion">
+        <summary>Categorías</summary>
+        <div class="filter-accordion-content" id="mobile-category-filters">
+          @for (category of catalogNavigation.categories(); track category.id_categoria) {
+            <label>
+              <input
+                type="checkbox"
+                [checked]="catalogNavigation.selectedCategories().includes(category.nombre)"
+                (change)="toggleMobileCategory(category.nombre)"
+              />
+              {{ category.nombre }}
+            </label>
+          }
+          <button
+            class="filter-reset"
+            type="button"
+            (click)="
+              catalogNavigation.selectedCategories.set([]);
+              catalogNavigation.selectedCategory.set('')
+            "
+          >
+            Limpiar categorías
+          </button>
+        </div>
+      </details>
+
+      <details class="filter-accordion">
+        <summary>Rango de precio</summary>
+        <div class="filter-accordion-content" id="mobile-price-filter">
+          <label for="mobile-max-price">
+            Hasta: {{ catalogNavigation.selectedMaxPrice() | currency: 'USD' }}
+          </label>
+          <input
+            id="mobile-max-price"
+            class="mobile-price-slider"
+            type="range"
+            min="0"
+            [max]="catalogNavigation.maximumAvailablePrice()"
+            step="1"
+            [value]="catalogNavigation.selectedMaxPrice()"
+            [attr.aria-valuetext]="
+              'Hasta ' + (catalogNavigation.selectedMaxPrice() | currency: 'USD')
+            "
+            (input)="updateMobileMaxPrice($event)"
+          />
+          <div class="mobile-price-bounds">
+            <span>{{ 0 | currency: 'USD' }}</span>
+            <span>{{ catalogNavigation.maximumAvailablePrice() | currency: 'USD' }}</span>
+          </div>
+          <button
+            class="filter-reset"
+            type="button"
+            (click)="
+              catalogNavigation.selectedMaxPrice.set(catalogNavigation.maximumAvailablePrice())
+            "
+          >
+            Limpiar precio
+          </button>
+        </div>
+      </details>
+
+      <details class="filter-accordion">
+        <summary>Calificación</summary>
+        <div class="filter-accordion-content" id="mobile-rating-filter">
+          <label>
+            <input
+              type="radio"
+              name="mobile-minimum-rating"
+              [checked]="catalogNavigation.selectedMinimumRating() === 0"
+              (change)="catalogNavigation.selectedMinimumRating.set(0)"
+            />
+            Todas
+          </label>
+          @for (rating of minimumRatingOptions; track rating) {
+            <label>
+              <input
+                type="radio"
+                name="mobile-minimum-rating"
+                [checked]="catalogNavigation.selectedMinimumRating() === rating"
+                (change)="catalogNavigation.selectedMinimumRating.set(rating)"
+              />
+              {{ rating }} estrellas o más
+            </label>
+          }
+        </div>
+      </details>
+    </section>
   </div>
 </header>
