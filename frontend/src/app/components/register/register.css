@@ -235,3 +235,46 @@ form {
     font-size: 11px;
   }
 }
+
+:host-context(html[data-theme='dark']) {
+  color: #0f172a;
+  background: #f1f5f9;
+}
+
+:host-context(html[data-theme='dark']) .register-page {
+  color: #0f172a;
+  background: #f1f5f9;
+}
+
+:host-context(html[data-theme='dark']) .register-card {
+  color: #0f172a;
+  background: #fff;
+}
+
+:host-context(html[data-theme='dark']) .register-card h1 {
+  color: #111827;
+}
+
+:host-context(html[data-theme='dark']) .register-header p {
+  color: #64748b;
+}
+
+:host-context(html[data-theme='dark']) .login-prompt,
+:host-context(html[data-theme='dark']) .trust-badges {
+  color: #334155;
+}
+
+:host-context(html[data-theme='dark']) .input-field {
+  border-color: #cbd5e1;
+  color: #94a3b8;
+  background: #f8fafc;
+}
+
+:host-context(html[data-theme='dark']) .input-field input {
+  color: #334155;
+  background: transparent;
+}
+
+:host-context(html[data-theme='dark']) .input-field input::placeholder {
+  color: #64748b;
+}

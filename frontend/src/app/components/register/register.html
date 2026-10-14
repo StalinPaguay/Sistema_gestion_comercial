@@ -22,6 +22,8 @@
             autocomplete="given-name"
             aria-label="Nombres"
             required
+            minlength="2"
+            maxlength="100"
             ngModel
           />
         </label>
@@ -38,6 +40,8 @@
             autocomplete="family-name"
             aria-label="Apellidos"
             required
+            minlength="2"
+            maxlength="100"
             ngModel
           />
         </label>
@@ -55,6 +59,7 @@
             aria-label="Correo Electrónico"
             required
             email
+            maxlength="150"
             ngModel
           />
         </label>
@@ -66,10 +71,10 @@
           <input
             type="tel"
             name="phone"
-            placeholder="Teléfono"
+            placeholder="Teléfono (opcional)"
             autocomplete="tel"
-            aria-label="Teléfono"
-            required
+            aria-label="Teléfono (opcional)"
+            maxlength="20"
             ngModel
           />
         </label>
@@ -86,6 +91,7 @@
             placeholder="Identificación (opcional)"
             autocomplete="off"
             aria-label="Identificación (opcional)"
+            maxlength="20"
             ngModel
           />
         </label>
@@ -103,7 +109,7 @@
             autocomplete="new-password"
             aria-label="Contraseña"
             required
-            minlength="8"
+            minlength="6"
             ngModel
           />
           <button
@@ -141,7 +147,7 @@
             autocomplete="new-password"
             aria-label="Confirmar contraseña"
             required
-            minlength="8"
+            minlength="6"
             ngModel
           />
           <button

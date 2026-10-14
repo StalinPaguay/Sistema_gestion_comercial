@@ -43,7 +43,7 @@ export class Register {
       Nombres: form.value.firstName.trim(),
       Apellidos: form.value.lastName.trim(),
       Email: form.value.email.trim(),
-      Telefono: form.value.phone.trim(),
+      Telefono: form.value.phone?.trim() || null,
       Password: password,
       Identificacion: form.value.identification?.trim() || null,
     };
@@ -54,7 +54,7 @@ export class Register {
       next: () => {
         this.isSubmitting.set(false);
         window.alert('Usuario registrado correctamente');
-        void this.router.navigate(['/login']);
+        void this.router.navigate(['/products']);
       },
       error: (error: HttpErrorResponse) => {
         this.feedback.set(this.getErrorMessage(error));

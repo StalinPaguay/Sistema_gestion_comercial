@@ -1,0 +1,144 @@
+<main class="cart-page">
+  <section class="cart-shell" aria-labelledby="cart-title">
+    <div class="cart-heading">
+      <div>
+        <p class="eyebrow">TU COMPRA</p>
+        <h1 id="cart-title">Carrito de Compras</h1>
+      </div>
+      <a class="continue-link" routerLink="/products">← Volver al catálogo</a>
+    </div>
+
+    <p *ngIf="feedback" class="cart-feedback" role="alert">{{ feedback }}</p>
+
+    <div *ngIf="cartService.items().length > 0; else emptyCart" class="cart-layout">
+      <section class="cart-table-card" aria-label="Productos en el carrito">
+        <div class="table-header">
+          <span>Producto</span>
+          <span>Precio Unitario</span>
+          <span>Cantidad</span>
+          <span>Subtotal</span>
+          <span class="actions-heading">Acciones</span>
+        </div>
+
+        <article class="cart-row" *ngFor="let item of cartService.items()">
+          <div class="product-cell">
+            <img [src]="item.product.urlImagen" [alt]="item.product.nombre" />
+            <div>
+              <span class="category-label">{{ item.product.categoria }}</span>
+              <h2>{{ item.product.nombre }}</h2>
+              <p>{{ item.product.marca }} · SKU {{ item.product.sku }}</p>
+              <p>{{ item.product.descripcion }}</p>
+            </div>
+          </div>
+          <span class="mobile-label">Precio unitario</span>
+          <strong class="unit-price">{{ item.product.precio | currency: 'USD' }}</strong>
+          <span class="mobile-label">Cantidad</span>
+          <div class="quantity-control" [attr.aria-label]="'Cantidad de ' + item.product.nombre">
+            <button
+              type="button"
+              [attr.aria-label]="'Reducir cantidad de ' + item.product.nombre"
+              (click)="decrease(item)"
+            >
+              −
+            </button>
+            <input
+              type="number"
+              min="1"
+              [max]="item.product.stock"
+              [value]="item.quantity"
+              [attr.aria-label]="'Cantidad de ' + item.product.nombre"
+              (change)="updateQuantity(item, $event)"
+            />
+            <button
+              type="button"
+              [disabled]="item.quantity >= item.product.stock"
+              [attr.aria-label]="'Aumentar cantidad de ' + item.product.nombre"
+              (click)="increase(item)"
+            >
+              +
+            </button>
+          </div>
+          <span class="mobile-label">Subtotal</span>
+          <strong class="line-total">
+            {{ item.product.precio * item.quantity | currency: 'USD' }}
+          </strong>
+          <button
+            class="remove-button"
+            type="button"
+            [attr.aria-label]="'Eliminar ' + item.product.nombre"
+            (click)="remove(item)"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7h16M10 11v6m4-6v6M5.5 7l1 14h11l1-14M9 7V4h6v3" />
+            </svg>
+          </button>
+        </article>
+      </section>
+
+      <aside class="order-summary" aria-labelledby="summary-title">
+        <h2 id="summary-title">Resumen del pedido</h2>
+        <div class="summary-line">
+          <span>Subtotal</span>
+          <strong>{{ cartService.subtotal() | currency: 'USD' }}</strong>
+        </div>
+        <div class="summary-line">
+          <span>Envío</span>
+          <strong class="free-shipping">Gratis</strong>
+        </div>
+        <p class="shipping-note">El costo de envío se confirma al completar tu pedido.</p>
+        <div class="summary-total">
+          <span>Total</span>
+          <strong>{{ cartService.total() | currency: 'USD' }}</strong>
+        </div>
+        <button class="checkout-button" type="button" (click)="checkout()">
+          Proceder al Pago
+          <span aria-hidden="true">→</span>
+        </button>
+        <div class="secure-note">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m12 3 8 3v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6z" />
+            <path d="m9 11 2 2 4-4" />
+          </svg>
+          Pago seguro y datos protegidos
+        </div>
+      </aside>
+
+      <section class="recommendations" aria-labelledby="recommendations-title">
+        <div class="recommendations-heading">
+          <div>
+            <p class="eyebrow">COMPLEMENTA TU COMPRA</p>
+            <h2 id="recommendations-title">También te puede interesar</h2>
+          </div>
+          <a routerLink="/products">Ver catálogo</a>
+        </div>
+        <div class="recommendation-grid">
+          <article *ngFor="let product of recommendedProducts" class="recommendation-card">
+            <img [src]="product.urlImagen" [alt]="product.nombre" loading="lazy" />
+            <div>
+              <span>{{ product.categoria }}</span>
+              <h3>{{ product.nombre }}</h3>
+              <strong>{{ product.precio | currency: 'USD' }}</strong>
+            </div>
+            <button
+              type="button"
+              [disabled]="product.stock <= 0"
+              [attr.aria-label]="'Agregar ' + product.nombre + ' al carrito'"
+              (click)="addRecommended(product.productoId)"
+            >
+              +
+            </button>
+          </article>
+        </div>
+      </section>
+    </div>
+
+    <ng-template #emptyCart>
+      <section class="empty-cart">
+        <div class="empty-icon" aria-hidden="true">🛒</div>
+        <h2>Tu carrito está vacío</h2>
+        <p>Explora el catálogo y agrega los productos que te interesan.</p>
+        <a routerLink="/products" class="checkout-button">Ir al catálogo</a>
+      </section>
+    </ng-template>
+  </section>
+</main>

@@ -8,7 +8,7 @@
       <p>Acceda a su cuenta para gestionar sus compras o administrar la tienda.</p>
     </header>
 
-    <form #loginForm="ngForm" (ngSubmit)="onSubmit(loginForm)">
+    <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
       <label class="input-field">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M3.5 5.5h17v13h-17z" />
@@ -16,13 +16,10 @@
         </svg>
         <input
           type="email"
-          name="email"
           placeholder="Correo Electrónico"
           autocomplete="username"
           aria-label="Correo Electrónico"
-          required
-          email
-          ngModel
+          formControlName="email"
         />
       </label>
 
@@ -34,12 +31,10 @@
         </svg>
         <input
           [type]="passwordVisible() ? 'text' : 'password'"
-          name="password"
           placeholder="Contraseña"
           autocomplete="current-password"
           aria-label="Contraseña"
-          required
-          ngModel
+          formControlName="password"
         />
         <button
           class="visibility-button"
@@ -65,12 +60,16 @@
         </button>
       </label>
 
-      <button class="submit-button" type="submit" [disabled]="loginForm.invalid">
+      <button
+        class="submit-button"
+        type="submit"
+        [disabled]="loginForm.invalid || isSubmitting()"
+      >
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M12 2v10" />
           <path d="M7.1 5.7a8 8 0 1 0 9.8 0" />
         </svg>
-        Iniciar Sesión
+        {{ isSubmitting() ? 'Iniciando sesión...' : 'Iniciar Sesión' }}
       </button>
 
       @if (feedback()) {
@@ -79,7 +78,7 @@
 
       <div class="form-options">
         <label class="remember-option">
-          <input type="checkbox" name="remember" />
+          <input type="checkbox" formControlName="remember" />
           <span>Recordarme</span>
         </label>
         <p>¿No tiene cuenta? <a routerLink="/register">Regístrese Aquí</a></p>

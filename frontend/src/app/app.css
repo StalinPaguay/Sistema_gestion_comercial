@@ -1,0 +1,29 @@
+:host {
+  display: block;
+  width: 100%;
+  min-height: 100vh;
+  background: var(--app-background);
+}
+
+.app-layout {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 100vh;
+  flex-direction: column;
+  background: var(--app-background);
+}
+
+.app-content {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  flex: 1 0 auto;
+  background: var(--app-background);
+}
+
+app-footer {
+  display: block;
+  width: 100%;
+  flex: 0 0 auto;
+}

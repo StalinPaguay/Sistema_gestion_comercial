@@ -1,0 +1,11 @@
+<div class="app-layout">
+  @if (showLayout()) {
+    <app-navbar />
+  }
+  <main class="app-content">
+    <router-outlet />
+  </main>
+  @if (showLayout()) {
+    <app-footer />
+  }
+</div>
