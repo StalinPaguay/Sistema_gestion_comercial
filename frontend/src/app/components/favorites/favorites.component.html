@@ -1,0 +1,100 @@
+<main class="favorites-page">
+  <header class="favorites-header">
+    <div>
+      <p class="eyebrow">TU SELECCIÓN</p>
+      <h1>Mis Favoritos</h1>
+      <p class="favorites-subtitle">
+        {{ favoritesService.getFavoritesCount() }}
+        {{ favoritesService.getFavoritesCount() === 1 ? 'producto guardado' : 'productos guardados' }}
+      </p>
+    </div>
+    <a class="back-link" routerLink="/products">← Volver al catálogo</a>
+  </header>
+
+  @if (feedback()) {
+    <p class="favorites-feedback" role="status">{{ feedback() }}</p>
+  }
+
+  @if (favoritesService.favorites().length > 0) {
+    <section class="favorites-list" aria-label="Productos favoritos">
+      @for (product of favoritesService.favorites(); track product.productoId; let index = $index) {
+        <article class="favorite-row">
+          <span class="row-index" aria-label="Producto número {{ index + 1 }}">
+            {{ formatIndex(index) }}
+          </span>
+          <img class="favorite-thumbnail" [src]="product.urlImagen" [alt]="product.nombre" loading="lazy" />
+          <div class="favorite-info">
+            <h2>{{ product.nombre }}</h2>
+            <p class="brand-sku">{{ product.marca }} <span>·</span> SKU {{ product.sku }}</p>
+            <div class="product-tags">
+              <span>#{{ product.categoria }}</span>
+              <span>#{{ product.marca }}</span>
+            </div>
+          </div>
+          <div class="row-actions">
+            <button
+              class="add-to-cart"
+              type="button"
+              [disabled]="!product.estado || product.stock <= 0"
+              (click)="addToCart(product)"
+            >
+              <span>{{ product.stock > 0 && product.estado ? 'Agregar al carrito' : 'Agotado' }}</span>
+              <strong>{{ product.precio | currency: 'USD' }}</strong>
+            </button>
+            <button
+              class="remove-favorite"
+              type="button"
+              [attr.aria-label]="'Quitar ' + product.nombre + ' de favoritos'"
+              title="Quitar de favoritos"
+              (click)="removeFavorite(product)"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7h16" />
+                <path d="M10 11v6m4-6v6" />
+                <path d="m6 7 1 14h10l1-14M9 7V4h6v3" />
+              </svg>
+            </button>
+            <details class="row-options">
+              <summary [attr.aria-label]="'Más opciones para ' + product.nombre" title="Más opciones">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="5" r="1.5" />
+                  <circle cx="12" cy="12" r="1.5" />
+                  <circle cx="12" cy="19" r="1.5" />
+                </svg>
+              </summary>
+              <div class="options-panel">
+                <p>{{ product.descripcion }}</p>
+                <span>{{ product.stock }} unidades disponibles</span>
+              </div>
+            </details>
+          </div>
+        </article>
+      }
+    </section>
+  } @else {
+    <section class="empty-favorites">
+      <div class="empty-heart" aria-hidden="true">
+        <svg viewBox="0 0 24 24">
+          <path
+            d="M20.8 8.7c0 5.2-8.8 11-8.8 11s-8.8-5.8-8.8-11A4.7 4.7 0 0 1 12 6a4.7 4.7 0 0 1 8.8 2.7Z"
+          />
+        </svg>
+      </div>
+      <h2>Aún no tienes favoritos</h2>
+      <p>Guarda los productos que te interesan y los encontrarás aquí.</p>
+      <a class="catalog-button" routerLink="/products">Explorar catálogo</a>
+    </section>
+  }
+
+  @if (selectedProduct(); as product) {
+    <app-add-to-cart-modal
+      [product]="product"
+      [availableQuantity]="availableQuantity"
+      [adding]="addingToCart()"
+      [errorMessage]="cartError()"
+      (confirmed)="confirmAddToCart($event)"
+      (cancelled)="closeCartModal()"
+      (cartOpened)="goToCart()"
+    />
+  }
+</main>

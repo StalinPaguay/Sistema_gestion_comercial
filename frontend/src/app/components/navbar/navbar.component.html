@@ -1,0 +1,181 @@
+<header class="site-navbar">
+  <a class="brand" routerLink="/products" aria-label="TECNOMEGA, inicio">
+    <span>TECNO</span><span class="brand-orange">MEGA</span>
+  </a>
+
+  <nav class="category-links" aria-label="Categorías de productos">
+    <a
+      href="#productos"
+      [class.active]="!catalogNavigation.selectedCategory()"
+      (click)="selectCategory(''); $event.preventDefault()"
+    >
+      Todos
+    </a>
+    @for (category of catalogNavigation.categories(); track category.id_categoria) {
+      <a
+        href="#productos"
+        [class.active]="catalogNavigation.selectedCategory() === category.nombre"
+        (click)="selectCategory(category.nombre); $event.preventDefault()"
+      >
+        {{ category.nombre }}
+      </a>
+    }
+  </nav>
+
+  <div class="nav-actions">
+    <label class="search-control">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="10.8" cy="10.8" r="6.8" />
+        <path d="m16 16 5 5" />
+      </svg>
+      <input
+        type="search"
+        placeholder="Buscar productos"
+        aria-label="Buscar productos"
+        [value]="catalogNavigation.searchTerm()"
+        (input)="updateSearch($event)"
+      />
+    </label>
+
+    @if (authService.accessToken()) {
+      <div class="account-menu" #accountMenu>
+        <button
+          class="action-link account-trigger"
+          type="button"
+          aria-label="Menú de cuenta"
+          title="Menú de cuenta"
+          aria-controls="account-popover"
+          [attr.aria-expanded]="accountMenuOpen()"
+          (click)="toggleAccountMenu()"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="8" r="3.5" />
+            <path d="M4.5 21a7.5 7.5 0 0 1 15 0" />
+          </svg>
+        </button>
+        @if (accountMenuOpen()) {
+          <section class="account-popover" id="account-popover" aria-label="Opciones de cuenta">
+            <a routerLink="/profile" (click)="accountMenuOpen.set(false)">Mi perfil</a>
+            <button type="button" (click)="logout()">Cerrar Sesión</button>
+          </section>
+        }
+      </div>
+    } @else {
+      <a
+        class="action-link"
+        routerLink="/login"
+        aria-label="Iniciar sesión"
+        title="Iniciar sesión"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="8" r="3.5" />
+          <path d="M4.5 21a7.5 7.5 0 0 1 15 0" />
+        </svg>
+      </a>
+    }
+
+    <button
+      class="action-link theme-toggle"
+      type="button"
+      [attr.aria-label]="themeService.theme() === 'light' ? 'Activar modo oscuro' : 'Activar modo claro'"
+      [attr.title]="themeService.theme() === 'light' ? 'Activar modo oscuro' : 'Activar modo claro'"
+      (click)="toggleTheme()"
+    >
+      @if (themeService.theme() === 'light') {
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20.2 15.1A8.5 8.5 0 0 1 8.9 3.8 8.6 8.6 0 1 0 20.2 15.1Z" />
+        </svg>
+      } @else {
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+        </svg>
+      }
+    </button>
+
+    <div class="favorites-menu" #favoritesMenu>
+      <button
+        class="action-link favorite-trigger"
+        type="button"
+        [attr.aria-label]="'Favoritos guardados, ' + favoritesService.getFavoritesCount() + ' productos'"
+        [attr.aria-expanded]="favoritesOpen()"
+        aria-controls="favorites-popover"
+        title="Favoritos guardados"
+        (click)="toggleFavorites()"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20.8 8.7c0 5.2-8.8 11-8.8 11s-8.8-5.8-8.8-11A4.7 4.7 0 0 1 12 6a4.7 4.7 0 0 1 8.8 2.7Z" />
+        </svg>
+        @if (favoritesService.getFavoritesCount() > 0) {
+          <span class="favorite-badge" aria-live="polite">
+            {{ favoritesService.getFavoritesCount() }}
+          </span>
+        }
+      </button>
+
+      @if (favoritesOpen()) {
+        <section class="favorites-popover" id="favorites-popover" aria-label="Vista previa de favoritos">
+          <header class="popover-header">
+            <h2>Favoritos guardados</h2>
+            <span>{{ favoritesService.getFavoritesCount() }}</span>
+          </header>
+
+          @if (favoritesService.getFavoritesCount() > 0) {
+            <ul class="popover-list">
+              @for (product of favoritesService.getFavorites().slice(0, 5); track product.productoId) {
+                <li class="popover-item">
+                  <img [src]="product.urlImagen" [alt]="product.nombre" width="50" height="50" />
+                  <div class="popover-product">
+                    <strong>{{ product.nombre }}</strong>
+                    <span>{{ product.categoria }} · {{ product.marca }}</span>
+                    <b>{{ product.precio | currency: 'USD' }}</b>
+                  </div>
+                  <button
+                    class="popover-add"
+                    type="button"
+                    [disabled]="!product.estado || product.stock <= 0"
+                    [attr.aria-label]="'Agregar ' + product.nombre + ' al carrito'"
+                    (click)="addFavoriteToCart(product)"
+                  >
+                    +
+                  </button>
+                </li>
+              }
+            </ul>
+            @if (favoritesService.getFavoritesCount() > 5) {
+              <p class="popover-more-count">
+                Y {{ favoritesService.getFavoritesCount() - 5 }} más en tu lista
+              </p>
+            }
+          } @else {
+            <p class="popover-empty">Todavía no guardaste productos favoritos.</p>
+          }
+
+          @if (cartMessage()) {
+            <p class="popover-message" role="status">{{ cartMessage() }}</p>
+          }
+
+          <button class="popover-footer" type="button" (click)="openFavorites()">
+            Ver más favoritos
+          </button>
+        </section>
+      }
+    </div>
+
+    <a
+      class="action-link cart-link"
+      routerLink="/cart"
+      [attr.aria-label]="'Carrito, ' + cartService.count() + ' artículos'"
+      title="Ver carrito"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 4h2l2.2 11.2a2 2 0 0 0 2 1.6h8.6a2 2 0 0 0 1.9-1.4L22 8H6" />
+        <circle cx="10" cy="20" r="1" />
+        <circle cx="18" cy="20" r="1" />
+      </svg>
+      @if (cartService.count() > 0) {
+        <span class="cart-badge" aria-live="polite">{{ cartService.count() }}</span>
+      }
+    </a>
+  </div>
+</header>

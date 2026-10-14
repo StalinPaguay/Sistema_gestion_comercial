@@ -1,0 +1,238 @@
+<main class="profile-page">
+  <header class="profile-header">
+    <div>
+      <p class="eyebrow">MI CUENTA</p>
+      <h1>Perfil y direcciones</h1>
+      <p class="profile-subtitle">Administra tus datos y direcciones de entrega.</p>
+    </div>
+    <div class="profile-header-actions">
+      <button class="logout-button" type="button" (click)="logout()">
+        <span aria-hidden="true">↪</span>
+        Cerrar Sesión
+      </button>
+      <a class="back-link" routerLink="/products">← Volver al catálogo</a>
+    </div>
+  </header>
+
+  @if (errorMessage()) {
+    <p class="feedback error" role="alert">{{ errorMessage() }}</p>
+  }
+  @if (successMessage()) {
+    <p class="feedback success" role="status">{{ successMessage() }}</p>
+  }
+  @if (loading()) {
+    <div class="loading-state" role="status">Cargando información de tu cuenta...</div>
+  } @else if (profile(); as user) {
+    <section class="profile-card" aria-labelledby="personal-heading">
+      <div class="section-heading">
+        <div class="avatar" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="8" r="3.5" />
+            <path d="M4.5 21a7.5 7.5 0 0 1 15 0" />
+          </svg>
+        </div>
+        <div>
+          <h2 id="personal-heading">Información personal</h2>
+          <p>Actualiza los datos asociados a tu cuenta.</p>
+        </div>
+      </div>
+
+      <form #profileForm="ngForm" (ngSubmit)="saveProfile(profileForm)">
+        <div class="form-grid">
+          <label>
+            <span>Nombres</span>
+            <input name="Nombres" [ngModel]="user.Nombres" required minlength="2" maxlength="100" />
+          </label>
+          <label>
+            <span>Apellidos</span>
+            <input name="Apellidos" [ngModel]="user.Apellidos" required minlength="2" maxlength="100" />
+          </label>
+          <label>
+            <span>Correo electrónico</span>
+            <input name="Email" type="email" [ngModel]="user.Email" required maxlength="150" />
+          </label>
+          <label>
+            <span>Teléfono</span>
+            <input name="Telefono" type="tel" [ngModel]="user.Telefono ?? ''" maxlength="20" />
+          </label>
+          <label>
+            <span>Identificación</span>
+            <input [value]="user.Identificacion ?? 'No disponible'" disabled />
+          </label>
+          <label>
+            <span>Tipo de cuenta</span>
+            <input [value]="user.Rol" disabled />
+          </label>
+        </div>
+        @if (user.ClienteId === null) {
+          <p class="form-note">
+            Tu usuario no tiene un perfil de cliente asociado. La edición requiere un ClienteId.
+          </p>
+        }
+        <button class="primary-button" type="submit" [disabled]="profileForm.invalid || savingProfile() || user.ClienteId === null">
+          {{ savingProfile() ? 'Guardando...' : 'Guardar cambios' }}
+        </button>
+      </form>
+    </section>
+
+    <section class="profile-card password-card" aria-labelledby="password-heading">
+      <div class="section-heading">
+        <div>
+          <h2 id="password-heading">Actualizar contraseña</h2>
+          <p>Cambia la contraseña asociada a tu cuenta.</p>
+        </div>
+      </div>
+
+      <form #passwordFormRef="ngForm" (ngSubmit)="updatePassword(passwordFormRef)">
+        <div class="form-grid">
+          <label>
+            <span>Contraseña actual</span>
+            <input
+              name="currentPassword"
+              type="password"
+              autocomplete="current-password"
+              required
+              minlength="4"
+              ngModel
+            />
+          </label>
+          <label>
+            <span>Nueva contraseña</span>
+            <input
+              name="newPassword"
+              type="password"
+              autocomplete="new-password"
+              required
+              minlength="6"
+              ngModel
+            />
+          </label>
+          <label>
+            <span>Confirmar nueva contraseña</span>
+            <input
+              name="confirmPassword"
+              type="password"
+              autocomplete="new-password"
+              required
+              minlength="6"
+              ngModel
+            />
+          </label>
+        </div>
+        @if (passwordFeedback()) {
+          <p class="password-feedback" [class.error]="passwordFeedbackIsError()" role="status">
+            {{ passwordFeedback() }}
+          </p>
+        }
+        <button class="primary-button" type="submit" [disabled]="passwordFormRef.invalid">
+          Actualizar contraseña
+        </button>
+      </form>
+    </section>
+
+    <section class="addresses-section" aria-labelledby="addresses-heading">
+      <div class="addresses-heading">
+        <div>
+          <p class="eyebrow">ENTREGAS</p>
+          <h2 id="addresses-heading">Direcciones guardadas</h2>
+          <p class="profile-subtitle">Elige dónde recibir tus pedidos.</p>
+        </div>
+        @if (user.ClienteId !== null) {
+          <button class="primary-button" type="button" (click)="openNewAddress()">
+            + Agregar dirección
+          </button>
+        }
+      </div>
+
+      @if (user.ClienteId === null) {
+        <div class="empty-addresses">
+          La gestión de direcciones está disponible para cuentas con perfil de cliente.
+        </div>
+      } @else if (addresses().length === 0) {
+        <div class="empty-addresses">
+          <strong>Aún no tienes direcciones guardadas</strong>
+          <span>Agrega una dirección para facilitar tus próximas compras.</span>
+          <button class="secondary-button" type="button" (click)="openNewAddress()">
+            Agregar mi primera dirección
+          </button>
+        </div>
+      } @else {
+        <div class="address-grid">
+          @for (address of addresses(); track address.DireccionId) {
+            <article class="address-card">
+              <div class="address-card-heading">
+                <span class="address-icon" aria-hidden="true">⌖</span>
+                @if (address.EsPrincipal) {
+                  <span class="primary-badge">Principal</span>
+                }
+              </div>
+              <h3>{{ address.Direccion }}</h3>
+              <p>{{ address.Ciudad || 'Ciudad no indicada' }}{{ address.Provincia ? ', ' + address.Provincia : '' }}</p>
+              @if (address.Referencia) {
+                <p class="address-secondary">Referencia: {{ address.Referencia }}</p>
+              }
+              @if (address.CodigoPostal) {
+                <p class="address-secondary">Código postal: {{ address.CodigoPostal }}</p>
+              }
+              <div class="address-actions">
+                @if (!address.EsPrincipal) {
+                  <button class="text-button" type="button" (click)="makePrimary(address)">Marcar principal</button>
+                }
+                <button class="text-button" type="button" (click)="editAddress(address)">Editar</button>
+                <button class="danger-button" type="button" (click)="deleteAddress(address)">Eliminar</button>
+              </div>
+            </article>
+          }
+        </div>
+      }
+
+      @if (addressFormOpen()) {
+        <section class="address-form-card" aria-labelledby="address-form-heading">
+          <div class="section-heading">
+            <div>
+              <h3 id="address-form-heading">
+                {{ editingAddressId() === null ? 'Agregar dirección' : 'Editar dirección' }}
+              </h3>
+              <p>Completa los datos de entrega.</p>
+            </div>
+            <button class="icon-button" type="button" aria-label="Cerrar formulario" (click)="cancelAddressForm()">×</button>
+          </div>
+          <form #addressFormRef="ngForm" (ngSubmit)="saveAddress(addressFormRef)">
+            <div class="form-grid">
+              <label>
+                <span>Provincia</span>
+                <input name="Provincia" [ngModel]="addressForm().Provincia" maxlength="100" />
+              </label>
+              <label>
+                <span>Ciudad</span>
+                <input name="Ciudad" [ngModel]="addressForm().Ciudad" maxlength="100" />
+              </label>
+              <label class="field-wide">
+                <span>Dirección</span>
+                <input name="Direccion" [ngModel]="addressForm().Direccion" required minlength="3" maxlength="250" />
+              </label>
+              <label class="field-wide">
+                <span>Referencia</span>
+                <input name="Referencia" [ngModel]="addressForm().Referencia" maxlength="250" />
+              </label>
+              <label>
+                <span>Código postal</span>
+                <input name="CodigoPostal" [ngModel]="addressForm().CodigoPostal" maxlength="20" />
+              </label>
+              <label class="check-field">
+                <input name="EsPrincipal" type="checkbox" [ngModel]="addressForm().EsPrincipal" />
+                <span>Establecer como dirección principal</span>
+              </label>
+            </div>
+            <div class="form-actions">
+              <button class="secondary-button" type="button" (click)="cancelAddressForm()">Cancelar</button>
+              <button class="primary-button" type="submit" [disabled]="addressFormRef.invalid || savingAddress()">
+                {{ savingAddress() ? 'Guardando...' : 'Guardar dirección' }}
+              </button>
+            </div>
+          </form>
+        </section>
+      }
+    </section>
+  }
+</main>

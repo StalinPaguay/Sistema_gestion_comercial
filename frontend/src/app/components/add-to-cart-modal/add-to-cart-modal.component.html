@@ -1,0 +1,189 @@
+<div class="cart-modal-backdrop" (click)="cancelled.emit()">
+  <section
+    class="cart-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="cart-modal-title"
+    (click)="stopPropagation($event)"
+  >
+    <button
+      class="cart-modal-close"
+      type="button"
+      aria-label="Cerrar ventana"
+      (click)="cancelled.emit()"
+    >
+      ×
+    </button>
+
+    <div class="cart-modal-product">
+      <div class="cart-modal-image">
+        <img [src]="product.urlImagen" [alt]="product.nombre" />
+      </div>
+      <div class="cart-modal-details">
+        <p class="cart-modal-eyebrow">CONFIRMAR PRODUCTO</p>
+        <h2 id="cart-modal-title">{{ product.nombre }}</h2>
+        <dl>
+          <div><dt>SKU</dt><dd>{{ product.sku || 'No disponible' }}</dd></div>
+          <div><dt>Categoría</dt><dd>{{ product.categoria || 'No disponible' }}</dd></div>
+          <div><dt>Marca</dt><dd>{{ product.marca || 'No disponible' }}</dd></div>
+          <div><dt>Precio unitario</dt><dd>{{ product.precio | currency: 'USD' }}</dd></div>
+          <div><dt>Stock disponible</dt><dd>{{ availableQuantity }} unidad(es)</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="cart-modal-bottom">
+      <div class="quantity-section">
+        <span class="quantity-label">Cantidad</span>
+        <div class="quantity-control">
+          <button
+            type="button"
+            aria-label="Disminuir cantidad"
+            [disabled]="quantity <= 1 || adding"
+            (click)="decrease()"
+          >−</button>
+          <input
+            type="number"
+            aria-label="Cantidad a agregar"
+            [value]="quantity"
+            [min]="1"
+            [max]="availableQuantity"
+            [disabled]="availableQuantity < 1 || adding"
+            (input)="setQuantity($event)"
+          />
+          <button
+            type="button"
+            aria-label="Aumentar cantidad"
+            [disabled]="quantity >= availableQuantity || adding"
+            (click)="increase()"
+          >+</button>
+        </div>
+      </div>
+      <div class="cart-modal-subtotal">
+        <span>Subtotal</span>
+        <strong>{{ subtotal | currency: 'USD' }}</strong>
+      </div>
+    </div>
+
+    @if (availableQuantity < 1) {
+      <p class="cart-modal-error" role="alert">No hay unidades disponibles para agregar.</p>
+    } @else if (errorMessage) {
+      <p class="cart-modal-error" role="alert">{{ errorMessage }}</p>
+    }
+
+    <div class="cart-modal-actions">
+      <button
+        class="cart-modal-submit"
+        type="button"
+        [disabled]="availableQuantity < 1 || adding"
+        (click)="confirm()"
+      >
+        {{ adding ? 'Agregando...' : '¡Añadir al Carrito!' }}
+      </button>
+      <button
+        class="cart-modal-continue"
+        type="button"
+        [disabled]="adding"
+        (click)="cancelled.emit()"
+      >
+        Seguir comprando
+      </button>
+      <button
+        class="cart-modal-go"
+        type="button"
+        [disabled]="adding"
+        (click)="cartOpened.emit()"
+      >
+        Ir al carrito
+      </button>
+    </div>
+
+    <section class="cart-reviews" aria-labelledby="cart-reviews-title">
+      <div class="cart-reviews-heading">
+        <h3 id="cart-reviews-title">Comentarios y reseñas</h3>
+        <span>{{ reviews.length }} {{ reviews.length === 1 ? 'opinión' : 'opiniones' }}</span>
+      </div>
+
+      @if (reviewsLoading) {
+        <p class="cart-reviews-status" role="status">Cargando reseñas...</p>
+      } @else if (reviewsError) {
+        <div class="cart-reviews-error" role="alert">
+          <span>{{ reviewsError }}</span>
+          <button type="button" (click)="reloadReviews()">Reintentar</button>
+        </div>
+      } @else if (reviews.length === 0) {
+        <p class="cart-reviews-empty">
+          Este producto aún no tiene reseñas. ¡Sé el primero en calificarlo!
+        </p>
+      } @else {
+        <div class="cart-reviews-list" aria-live="polite">
+          @for (review of reviews; track review.ResenaId) {
+            <article class="cart-review">
+              <div class="cart-review-heading">
+                <strong>{{ review.Usuario }}</strong>
+                <span
+                  class="cart-review-stars"
+                  [attr.aria-label]="review.Calificacion + ' de 5 estrellas'"
+                >{{ '★'.repeat(review.Calificacion) }}{{ '☆'.repeat(5 - review.Calificacion) }}</span>
+              </div>
+              @if (review.Fecha) {
+                <time>{{ review.Fecha | date: 'mediumDate' }}</time>
+              }
+              @if (review.Comentario) {
+                <p>{{ review.Comentario }}</p>
+              }
+            </article>
+          }
+        </div>
+      }
+
+      <form class="cart-review-form" (ngSubmit)="submitReview()">
+        <h4>Deja tu opinión</h4>
+        <span class="cart-review-label">Tu calificación</span>
+        <div
+          class="cart-review-rating"
+          role="group"
+          aria-label="Seleccionar calificación de una a cinco estrellas"
+          (mouseleave)="hoverRating = 0"
+        >
+          @for (star of stars; track star) {
+            <button
+              type="button"
+              [class.selected]="star <= (hoverRating || selectedRating)"
+              [attr.aria-label]="star + ' de 5 estrellas'"
+              [attr.aria-pressed]="selectedRating === star"
+              (mouseenter)="hoverRating = star"
+              (focus)="hoverRating = star"
+              (blur)="hoverRating = 0"
+              (click)="selectRating(star)"
+            >★</button>
+          }
+        </div>
+        <label class="cart-review-label" for="cart-review-comment">Comentario (opcional)</label>
+        <textarea
+          id="cart-review-comment"
+          name="reviewComment"
+          [(ngModel)]="reviewComment"
+          maxlength="1000"
+          rows="3"
+          placeholder="Comparte tu experiencia con este producto"
+          [disabled]="reviewSubmitting"
+        ></textarea>
+        @if (reviewSubmitError) {
+          <p class="cart-review-form-error" role="alert">{{ reviewSubmitError }}</p>
+          @if (!isAuthenticated) {
+            <button class="cart-review-login" type="button" (click)="goToLogin()">
+              Iniciar sesión
+            </button>
+          }
+        }
+        @if (reviewMessage) {
+          <p class="cart-review-success" role="status">{{ reviewMessage }}</p>
+        }
+        <button class="cart-review-submit" type="submit" [disabled]="reviewSubmitting">
+          {{ reviewSubmitting ? 'Enviando...' : 'Enviar Opinión' }}
+        </button>
+      </form>
+    </section>
+  </section>
+</div>
