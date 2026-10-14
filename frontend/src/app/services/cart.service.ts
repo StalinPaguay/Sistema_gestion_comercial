@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { Observable } from 'rxjs';
+import { concatMap, defaultIfEmpty, from, last, Observable, tap } from 'rxjs';
 import { API_BASE_URL } from './api.config';
 import { getProductImage, Product } from './product.service';
 
@@ -80,9 +80,41 @@ export class CartService {
     return this.http.delete<ApiCartResponse>(`${API_BASE_URL}/carrito`);
   }
 
+  reconcileGuestCart(availableProducts: Product[] = []): Observable<ApiCartResponse> {
+    const guestItems = this.items().filter((item) => item.apiDetailId === undefined);
+
+    return this.getRemoteCart().pipe(
+      concatMap((initialResponse) => {
+        this.syncFromApi(initialResponse, availableProducts);
+        return from(guestItems).pipe(
+          concatMap((guestItem) =>
+            this.addRemoteProduct(guestItem.product.productoId, guestItem.quantity).pipe(
+              tap((response) => {
+                const remoteItems = this.toCartItems(response, availableProducts);
+                const pendingGuestItems = this.items().filter(
+                  (item) =>
+                    item.apiDetailId === undefined &&
+                    item.product.productoId !== guestItem.product.productoId,
+                );
+                this.setItems([...remoteItems, ...pendingGuestItems]);
+              }),
+            ),
+          ),
+          defaultIfEmpty(initialResponse),
+          last(),
+        );
+      }),
+    );
+  }
+
   syncFromApi(response: ApiCartResponse, availableProducts: Product[] = []): void {
+    const guestItems = this.items().filter((item) => item.apiDetailId === undefined);
+    this.setItems([...this.toCartItems(response, availableProducts), ...guestItems]);
+  }
+
+  private toCartItems(response: ApiCartResponse, availableProducts: Product[]): CartItem[] {
     const existingItems = this.items();
-    const items = response.Items.map((apiItem): CartItem => {
+    return response.Items.map((apiItem): CartItem => {
       const product =
         availableProducts.find((item) => item.productoId === apiItem.ProductoId) ??
         existingItems.find((item) => item.product.productoId === apiItem.ProductoId)?.product;
@@ -111,7 +143,6 @@ export class CartService {
         apiDetailId: apiItem.DetalleCarritoId,
       };
     });
-    this.setItems(items);
   }
 
   addProduct(product: Product, amount = 1): boolean {

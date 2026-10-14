@@ -3,6 +3,7 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService, LoginCredentials } from '../../services/auth.service';
+import { CartService } from '../../services/cart.service';
 
 @Component({
   imports: [ReactiveFormsModule, RouterLink],
@@ -14,6 +15,7 @@ export class Login implements OnInit {
   private readonly rememberedEmailKey = 'tecnomega_remembered_email';
   private readonly rememberMeKey = 'tecnomega_remember_me';
   private readonly authService = inject(AuthService);
+  private readonly cartService = inject(CartService);
   private readonly router = inject(Router);
 
   protected readonly passwordVisible = signal(false);
@@ -57,8 +59,10 @@ export class Login implements OnInit {
     this.isSubmitting.set(true);
     this.authService.login(credentials, formValue.remember).subscribe({
       next: () => {
-        this.isSubmitting.set(false);
-        void this.router.navigate(['/products']);
+        this.cartService.reconcileGuestCart().subscribe({
+          next: () => this.finishLogin(),
+          error: () => this.finishLogin('/cart'),
+        });
       },
       error: (error: HttpErrorResponse) => {
         const detail: unknown = error.error?.detail;
@@ -72,6 +76,11 @@ export class Login implements OnInit {
         this.isSubmitting.set(false);
       },
     });
+  }
+
+  private finishLogin(route: '/products' | '/cart' = '/products'): void {
+    this.isSubmitting.set(false);
+    void this.router.navigate([route]);
   }
 
   private readRememberedCredentials(): { email: string } | null {

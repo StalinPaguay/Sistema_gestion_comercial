@@ -169,6 +169,12 @@ h1 {
   font-weight: 700;
 }
 
+.required-indicator {
+  color: #b91c1c;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
 .form-grid input:not([type='checkbox']) {
   width: 100%;
   min-height: 42px;
@@ -182,7 +188,57 @@ h1 {
   font-weight: 400;
 }
 
+.password-input {
+  position: relative;
+  width: 100%;
+}
+
+.password-input input:not([type='checkbox']) {
+  padding-right: 44px;
+}
+
+.password-visibility-button {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  padding: 3px;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 5px;
+  color: var(--text-secondary, #64748b);
+  background: transparent;
+  cursor: pointer;
+}
+
+.password-visibility-button:hover {
+  color: var(--text-accent, #0759c7);
+}
+
+.password-visibility-button:focus-visible {
+  outline: 2px solid #3981d9;
+  outline-offset: 2px;
+}
+
+.password-visibility-button svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
 .form-grid input:focus {
+  border-color: #3981d9;
+  box-shadow: 0 0 0 3px rgb(57 129 217 / 12%);
+}
+
+.password-input:focus-within input:not([type='checkbox']) {
   border-color: #3981d9;
   box-shadow: 0 0 0 3px rgb(57 129 217 / 12%);
 }
@@ -190,6 +246,19 @@ h1 {
 .form-grid input:disabled {
   opacity: 0.72;
   cursor: not-allowed;
+}
+
+.form-grid input[readonly] {
+  color: var(--text-secondary, #64748b);
+  background: var(--app-surface-muted, #f1f5f9);
+  cursor: default;
+}
+
+.form-note {
+  margin: 12px 0 0;
+  color: var(--text-secondary, #64748b);
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 .field-wide {
@@ -502,4 +571,5 @@ h1 {
   .form-actions button {
     width: 100%;
   }
+
 }

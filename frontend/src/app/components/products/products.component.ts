@@ -3,7 +3,7 @@ import { ChangeDetectorRef, Component, effect, inject, OnDestroy, OnInit } from 
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { catchError, forkJoin, of } from 'rxjs';
+import { forkJoin, Subscription } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { CartService } from '../../services/cart.service';
 import { FavoritesService } from '../../services/favorites.service';
@@ -62,6 +62,8 @@ export class ProductsComponent implements OnInit, OnDestroy {
   cartAddError = '';
   cartAdding = false;
   ratingSummaries: Record<number, ProductReviews | null | undefined> = {};
+  ratingLoadWarning = '';
+  ratingLoading = false;
   selectedReviews: ProductReview[] = [];
   reviewsExpanded = false;
   selectedRating = 0;
@@ -74,6 +76,8 @@ export class ProductsComponent implements OnInit, OnDestroy {
   currentIndex = 0;
   private autoSlideInterval: ReturnType<typeof setInterval> | undefined;
   private noticeTimeout: ReturnType<typeof setTimeout> | undefined;
+  private detailSubscription?: Subscription;
+  private selectedReviewsSubscription?: Subscription;
 
   constructor(private readonly cdr: ChangeDetectorRef) {
     effect(() => {
@@ -127,6 +131,8 @@ export class ProductsComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopAutoSlide();
+    this.detailSubscription?.unsubscribe();
+    this.selectedReviewsSubscription?.unsubscribe();
     if (this.noticeTimeout) {
       clearTimeout(this.noticeTimeout);
     }
@@ -228,6 +234,7 @@ export class ProductsComponent implements OnInit, OnDestroy {
         this.products = [];
         this.categories = [];
         this.ratingSummaries = {};
+        this.ratingLoadWarning = '';
         this.catalogNavigation.setCategories([]);
         this.loadWarning =
           error instanceof HttpErrorResponse && error.status === 0
@@ -386,6 +393,8 @@ export class ProductsComponent implements OnInit, OnDestroy {
   }
 
   showDetails(product: Product): void {
+    this.detailSubscription?.unsubscribe();
+    this.selectedReviewsSubscription?.unsubscribe();
     this.selectedProduct = product;
     this.detailWarning = '';
     this.detailLoading = true;
@@ -397,14 +406,20 @@ export class ProductsComponent implements OnInit, OnDestroy {
     this.reviewMessage = '';
     this.reviewError = '';
     this.reviewLoading = true;
-    this.productService.getProductById(product.productoId).subscribe({
+    this.detailSubscription = this.productService.getProductById(product.productoId).subscribe({
       next: (result) => {
+        if (this.selectedProduct?.productoId !== product.productoId) {
+          return;
+        }
         this.selectedProduct = result.data;
         this.detailWarning = '';
         this.detailLoading = false;
         this.cdr.detectChanges();
       },
       error: (error: unknown) => {
+        if (this.selectedProduct?.productoId !== product.productoId) {
+          return;
+        }
         this.detailWarning =
           error instanceof HttpErrorResponse && error.status === 404
             ? 'Este producto ya no está disponible.'
@@ -417,7 +432,11 @@ export class ProductsComponent implements OnInit, OnDestroy {
   }
 
   closeDetails(): void {
+    this.detailSubscription?.unsubscribe();
+    this.selectedReviewsSubscription?.unsubscribe();
     this.selectedProduct = null;
+    this.detailLoading = false;
+    this.reviewLoading = false;
     this.reviewsExpanded = false;
     this.detailWarning = '';
     this.reviewError = '';
@@ -481,35 +500,60 @@ export class ProductsComponent implements OnInit, OnDestroy {
   }
 
   private loadRatingSummaries(products: Product[]): void {
+    this.ratingLoadWarning = '';
+    this.ratingLoading = products.length > 0;
     for (const product of products) {
       this.ratingSummaries[product.productoId] = undefined;
     }
     if (!products.length) {
+      this.ratingLoading = false;
       return;
     }
 
-    forkJoin(
-      products.map((product) =>
-        this.reviewService.getProductReviews(product.productoId).pipe(catchError(() => of(null))),
-      ),
-    ).subscribe((summaries) => {
-      products.forEach((product, index) => {
-        this.ratingSummaries[product.productoId] = summaries[index];
+    this.reviewService
+      .getProductReviewSummaries(products.map((product) => product.productoId))
+      .subscribe({
+        next: (result) => {
+          this.ratingSummaries[result.productId] = result.reviews;
+          if (result.failed) {
+            const failedCount = Object.values(this.ratingSummaries).filter(
+              (summary) => summary === null,
+            ).length;
+            this.ratingLoadWarning =
+              failedCount === products.length
+                ? 'No se pudieron cargar las calificaciones. Inténtalo de nuevo.'
+                : `No se pudieron cargar las calificaciones de ${failedCount} producto(s).`;
+          }
+          this.cdr.detectChanges();
+        },
+        complete: () => {
+          this.ratingLoading = false;
+          this.cdr.detectChanges();
+        },
       });
-      this.cdr.detectChanges();
-    });
+  }
+
+  retryRatingSummaries(): void {
+    this.loadRatingSummaries(this.products);
   }
 
   private loadSelectedReviews(productId: number): void {
+    this.selectedReviewsSubscription?.unsubscribe();
     this.reviewLoading = true;
-    this.reviewService.getProductReviews(productId).subscribe({
+    this.selectedReviewsSubscription = this.reviewService.getProductReviews(productId).subscribe({
       next: (reviews) => {
+        if (this.selectedProduct?.productoId !== productId) {
+          return;
+        }
         this.ratingSummaries[productId] = reviews;
         this.selectedReviews = reviews.Resenas;
         this.reviewLoading = false;
         this.cdr.detectChanges();
       },
       error: (error: unknown) => {
+        if (this.selectedProduct?.productoId !== productId) {
+          return;
+        }
         this.ratingSummaries[productId] = null;
         this.reviewError = this.reviewErrorMessage(error);
         this.reviewLoading = false;

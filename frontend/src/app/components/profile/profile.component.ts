@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
@@ -13,6 +13,7 @@ import {
 } from '../../services/user.service';
 
 interface AddressForm {
+  Identificacion: string;
   Provincia: string;
   Ciudad: string;
   Direccion: string;
@@ -22,6 +23,7 @@ interface AddressForm {
 }
 
 const EMPTY_ADDRESS_FORM: AddressForm = {
+  Identificacion: '',
   Provincia: '',
   Ciudad: '',
   Direccion: '',
@@ -44,17 +46,35 @@ export class ProfileComponent implements OnInit {
   private readonly router = inject(Router);
 
   protected readonly profile = signal<UserProfile | null>(null);
+  protected readonly requiresAddressIdentification = computed(
+    () => !this.profile()?.Identificacion?.trim(),
+  );
   protected readonly addresses = signal<DeliveryAddress[]>([]);
+  protected readonly addressPendingDeletion = signal<DeliveryAddress | null>(null);
   protected readonly addressForm = signal<AddressForm>({ ...EMPTY_ADDRESS_FORM });
   protected readonly editingAddressId = signal<number | null>(null);
   protected readonly addressFormOpen = signal(false);
   protected readonly loading = signal(true);
   protected readonly savingProfile = signal(false);
   protected readonly savingAddress = signal(false);
+  protected readonly deletingAddress = signal(false);
+  protected readonly savingPassword = signal(false);
   protected readonly errorMessage = signal('');
   protected readonly successMessage = signal('');
   protected readonly passwordFeedback = signal('');
   protected readonly passwordFeedbackIsError = signal(false);
+  protected readonly currentPasswordVisible = signal(false);
+  protected readonly newPasswordVisible = signal(false);
+  protected readonly confirmPasswordVisible = signal(false);
+
+  protected togglePasswordVisibility(field: 'current' | 'new' | 'confirm'): void {
+    const visibility = {
+      current: this.currentPasswordVisible,
+      new: this.newPasswordVisible,
+      confirm: this.confirmPasswordVisible,
+    }[field];
+    visibility.update((visible) => !visible);
+  }
 
   ngOnInit(): void {
     if (!this.authService.accessToken()) {
@@ -78,7 +98,6 @@ export class ProfileComponent implements OnInit {
       Apellidos: String(form.value['Apellidos']).trim(),
       Email: String(form.value['Email']).trim(),
       Telefono: String(form.value['Telefono'] ?? '').trim() || null,
-      Identificacion: String(form.value['Identificacion'] ?? '').trim() || null,
     };
     this.errorMessage.set('');
     this.successMessage.set('');
@@ -91,7 +110,9 @@ export class ProfileComponent implements OnInit {
         } else {
           this.profile.set({ ...current, ...update });
         }
-        this.successMessage.set('Tus datos personales se actualizaron correctamente.');
+        this.successMessage.set(
+          'Tus datos personales se actualizaron correctamente. La identificación se muestra como dato de solo lectura.',
+        );
         this.savingProfile.set(false);
       },
       error: (error: unknown) => {
@@ -108,27 +129,51 @@ export class ProfileComponent implements OnInit {
   }
 
   protected updatePassword(form: NgForm): void {
-    if (form.invalid) {
+    if (form.invalid || this.savingPassword()) {
       this.passwordFeedback.set('Completa correctamente los tres campos de contraseña.');
       this.passwordFeedbackIsError.set(true);
       return;
     }
 
-    if (form.value['newPassword'] !== form.value['confirmPassword']) {
+    const currentPassword = String(form.value['currentPassword'] ?? '');
+    const newPassword = String(form.value['newPassword'] ?? '');
+    const confirmPassword = String(form.value['confirmPassword'] ?? '');
+    if (newPassword !== confirmPassword) {
       this.passwordFeedback.set('La nueva contraseña y su confirmación no coinciden.');
       this.passwordFeedbackIsError.set(true);
       return;
     }
 
-    this.passwordFeedback.set(
-      'La interfaz está lista, pero el backend aún no ofrece un endpoint para actualizar la contraseña.',
-    );
-    this.passwordFeedbackIsError.set(true);
+    this.passwordFeedback.set('');
+    this.savingPassword.set(true);
+    this.userService
+      .updatePassword({
+        PasswordActual: currentPassword,
+        PasswordNuevo: newPassword,
+      })
+      .subscribe({
+        next: (response) => {
+          this.passwordFeedback.set(
+            response.mensaje || response.message || 'La contraseña se actualizó correctamente.',
+          );
+          this.passwordFeedbackIsError.set(false);
+          this.savingPassword.set(false);
+          form.resetForm();
+        },
+        error: (error: unknown) => {
+          this.passwordFeedback.set(this.passwordRequestError(error));
+          this.passwordFeedbackIsError.set(true);
+          this.savingPassword.set(false);
+        },
+      });
   }
 
   protected openNewAddress(): void {
     this.editingAddressId.set(null);
-    this.addressForm.set({ ...EMPTY_ADDRESS_FORM });
+    this.addressForm.set({
+      ...EMPTY_ADDRESS_FORM,
+      Identificacion: this.profile()?.Identificacion?.trim() ?? '',
+    });
     this.addressFormOpen.set(true);
     this.errorMessage.set('');
     this.successMessage.set('');
@@ -137,6 +182,7 @@ export class ProfileComponent implements OnInit {
   protected editAddress(address: DeliveryAddress): void {
     this.editingAddressId.set(address.DireccionId);
     this.addressForm.set({
+      Identificacion: this.profile()?.Identificacion?.trim() ?? '',
       Provincia: address.Provincia ?? '',
       Ciudad: address.Ciudad ?? '',
       Direccion: address.Direccion,
@@ -228,21 +274,36 @@ export class ProfileComponent implements OnInit {
   }
 
   protected deleteAddress(address: DeliveryAddress): void {
-    if (!globalThis.confirm(`¿Eliminar la dirección "${address.Direccion}"?`)) {
+    this.addressPendingDeletion.set(address);
+  }
+
+  protected cancelAddressDeletion(): void {
+    if (!this.deletingAddress()) {
+      this.addressPendingDeletion.set(null);
+    }
+  }
+
+  protected confirmDeleteAddress(): void {
+    const address = this.addressPendingDeletion();
+    if (!address || this.deletingAddress()) {
       return;
     }
 
     this.errorMessage.set('');
     this.successMessage.set('');
+    this.deletingAddress.set(true);
     this.userService.deleteAddress(address.DireccionId).subscribe({
       next: () => {
         this.addresses.update((current) =>
           current.filter((item) => item.DireccionId !== address.DireccionId),
         );
         this.successMessage.set('La dirección se eliminó correctamente.');
+        this.addressPendingDeletion.set(null);
+        this.deletingAddress.set(false);
       },
       error: (error: unknown) => {
         this.errorMessage.set(this.requestError(error, 'No se pudo eliminar la dirección.'));
+        this.deletingAddress.set(false);
       },
     });
   }
@@ -296,6 +357,35 @@ export class ProfileComponent implements OnInit {
       }
     }
     return fallback;
+  }
+
+  private passwordRequestError(error: unknown): string {
+    if (error instanceof HttpErrorResponse) {
+      const detail: unknown = error.error?.detail;
+      if (typeof detail === 'string') {
+        return detail;
+      }
+      if (Array.isArray(detail)) {
+        const messages = detail
+          .map((item: unknown) =>
+            typeof item === 'object' && item !== null && 'msg' in item
+              ? String(item.msg)
+              : '',
+          )
+          .filter((message) => message.length > 0);
+        if (messages.length > 0) {
+          return messages.join(' ');
+        }
+      }
+      if (error.status === 0) {
+        return 'No se pudo conectar con el servidor. La contraseña no se actualizó.';
+      }
+      if (error.status === 401) {
+        this.logout();
+        return 'Tu sesión expiró. Inicia sesión nuevamente.';
+      }
+    }
+    return 'No se pudo actualizar la contraseña. Inténtalo nuevamente.';
   }
 
   private isProfile(value: unknown): value is Partial<UserProfile> {

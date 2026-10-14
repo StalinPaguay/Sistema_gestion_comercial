@@ -160,6 +160,22 @@
           <button type="button" (click)="loadCatalog()">Reintentar</button>
         </div>
 
+        <div
+          *ngIf="ratingLoadWarning"
+          class="rating-load-warning"
+          role="alert"
+          aria-live="polite"
+        >
+          <span>{{ ratingLoadWarning }}</span>
+          <button
+            type="button"
+            [disabled]="ratingLoading"
+            (click)="retryRatingSummaries()"
+          >
+            {{ ratingLoading ? 'Cargando...' : 'Reintentar calificaciones' }}
+          </button>
+        </div>
+
         <div *ngIf="loading" class="catalog-state" role="status" aria-live="polite">
           <span class="loading-spinner" aria-hidden="true"></span>
           <span>Cargando productos del catálogo...</span>

@@ -78,8 +78,8 @@ export class Cart implements OnInit {
   }
 
   private loadRemoteCart(products: Product[]): void {
-    this.cartService.getRemoteCart().subscribe({
-      next: (response) => this.cartService.syncFromApi(response, products),
+    this.cartService.reconcileGuestCart(products).subscribe({
+      next: () => undefined,
       error: (error: unknown) => this.showError(error),
     });
   }

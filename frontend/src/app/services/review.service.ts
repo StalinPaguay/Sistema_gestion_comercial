@@ -1,6 +1,6 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { catchError, from, mergeMap, Observable, of } from 'rxjs';
 import { API_BASE_URL } from './api.config';
 import { AuthService } from './auth.service';
 
@@ -19,6 +19,12 @@ export interface ProductReviews {
   Resenas: ProductReview[];
 }
 
+export interface ProductReviewSummaryResult {
+  productId: number;
+  reviews: ProductReviews | null;
+  failed: boolean;
+}
+
 export interface ReviewInput {
   Calificacion: number;
   Comentario: string | null;
@@ -32,10 +38,25 @@ export interface CreatedReview {
   Fecha: string;
 }
 
+const REVIEW_REQUEST_CONCURRENCY = 6;
+
 @Injectable({ providedIn: 'root' })
 export class ReviewService {
   private readonly http = inject(HttpClient);
   private readonly authService = inject(AuthService);
+
+  getProductReviewSummaries(productIds: number[]): Observable<ProductReviewSummaryResult> {
+    return from(productIds).pipe(
+      mergeMap(
+        (productId) =>
+          this.getProductReviews(productId).pipe(
+            mergeMap((reviews) => of({ productId, reviews, failed: false })),
+            catchError(() => of({ productId, reviews: null, failed: true })),
+          ),
+        REVIEW_REQUEST_CONCURRENCY,
+      ),
+    );
+  }
 
   getProductReviews(productId: number): Observable<ProductReviews> {
     return this.http.get<ProductReviews>(
