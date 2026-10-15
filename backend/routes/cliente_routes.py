@@ -5,13 +5,14 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from config.database import get_db
 from models.cliente import Cliente
 from models.direccion_cliente import DireccionCliente
 from models.persona import Persona
+from models.usuario import Usuario
 from services.auth_service import get_current_user
 
 router = APIRouter(
@@ -34,7 +35,7 @@ class DireccionEntrada(BaseModel):
 
 
 class DireccionActualizacion(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
     Provincia: str | None = None
     Ciudad: str | None = None
     Direccion: str | None = None
@@ -53,12 +54,39 @@ class ClienteCreacion(BaseModel):
 
 
 class ClienteActualizacion(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    Nombres: str | None = None
-    Apellidos: str | None = None
-    Email: str | None = None
-    Telefono: str | None = None
-    Estado: bool | None = None
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+    Identificacion: str | None = Field(
+        default=None,
+        min_length=5,
+        max_length=20,
+        validation_alias=AliasChoices("Identificacion", "identificacion", "cedula", "ruc", "identification"),
+    )
+    Nombres: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=100,
+        validation_alias=AliasChoices("Nombres", "nombres", "firstName"),
+    )
+    Apellidos: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=100,
+        validation_alias=AliasChoices("Apellidos", "apellidos", "lastName"),
+    )
+    Email: str | None = Field(
+        default=None,
+        max_length=150,
+        validation_alias=AliasChoices("Email", "email"),
+    )
+    Telefono: str | None = Field(
+        default=None,
+        max_length=20,
+        validation_alias=AliasChoices("Telefono", "telefono", "phone"),
+    )
+    Estado: bool | None = Field(
+        default=None,
+        validation_alias=AliasChoices("Estado", "estado", "active"),
+    )
 
 
 def serializar_cliente(cliente: Cliente) -> dict[str, Any]:
@@ -121,6 +149,50 @@ def listar_clientes(
         "desde": desde,
         "clientes": [serializar_cliente(c) for c in clientes],
     }
+
+
+@router.get("/me", summary="Obtener perfil de cliente del usuario autenticado")
+def obtener_mi_perfil_cliente(
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+):
+    cliente = db.query(Cliente).filter(Cliente.PersonaId == usuario.PersonaId).first()
+    if not cliente:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Perfil de cliente no encontrado.")
+    return serializar_cliente(cliente)
+
+
+@router.patch("/me", summary="Actualizar datos del perfil de cliente autenticado")
+def actualizar_mi_perfil_cliente(
+    datos: ClienteActualizacion,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+):
+    cliente = db.query(Cliente).filter(Cliente.PersonaId == usuario.PersonaId).first()
+    if not cliente:
+        if datos.Identificacion:
+            ident_limpia = datos.Identificacion.strip()
+            existe_otro = db.query(Cliente).filter(Cliente.Identificacion == ident_limpia).first()
+            if existe_otro:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Ya existe un cliente con esa identificación.",
+                )
+            cliente = Cliente(
+                PersonaId=usuario.PersonaId,
+                Identificacion=ident_limpia,
+                Estado=True,
+            )
+            db.add(cliente)
+            db.commit()
+            db.refresh(cliente)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Perfil de cliente no encontrado. Debe proporcionar una identificación para crearlo.",
+            )
+
+    return actualizar_cliente(cliente_id=cliente.ClienteId, datos=datos, db=db, _user=usuario)
 
 
 @router.get("/{cliente_id}", summary="Obtener detalle de cliente por ID")
@@ -194,16 +266,48 @@ def actualizar_cliente(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No se enviaron campos.")
 
     persona = cliente.Persona
-    if "Nombres" in campos:
-        persona.Nombres = campos["Nombres"]
-    if "Apellidos" in campos:
-        persona.Apellidos = campos["Apellidos"]
-    if "Email" in campos:
-        persona.Email = campos["Email"]
-    if "Telefono" in campos:
-        persona.Telefono = campos["Telefono"]
-    if "Estado" in campos:
-        cliente.Estado = campos["Estado"]
+
+    # Actualizar identificación si se especificó
+    if datos.Identificacion is not None:
+        ident_limpia = datos.Identificacion.strip()
+        if ident_limpia != cliente.Identificacion:
+            existe_otro = (
+                db.query(Cliente)
+                .filter(Cliente.Identificacion == ident_limpia, Cliente.ClienteId != cliente_id)
+                .first()
+            )
+            if existe_otro:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Ya existe otro cliente con esa identificación.",
+                )
+            cliente.Identificacion = ident_limpia
+
+    # Actualizar datos de Persona
+    if persona:
+        if datos.Nombres is not None:
+            persona.Nombres = datos.Nombres.strip()
+        if datos.Apellidos is not None:
+            persona.Apellidos = datos.Apellidos.strip()
+        if datos.Email is not None:
+            email_limpio = datos.Email.strip()
+            if email_limpio and email_limpio.lower() != (persona.Email or "").lower():
+                existe_email = (
+                    db.query(Persona)
+                    .filter(Persona.Email == email_limpio, Persona.PersonaId != persona.PersonaId)
+                    .first()
+                )
+                if existe_email:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Ya existe otra cuenta registrada con ese correo electrónico.",
+                    )
+            persona.Email = email_limpio or None
+        if datos.Telefono is not None:
+            persona.Telefono = datos.Telefono.strip() or None
+
+    if datos.Estado is not None:
+        cliente.Estado = datos.Estado
 
     db.commit()
     db.refresh(cliente)

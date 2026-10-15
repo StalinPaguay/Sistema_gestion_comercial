@@ -245,6 +245,68 @@ def test_direcciones_cliente_crud():
     assert len(list_res.json()) >= 1
 
 
+def test_actualizar_identificacion_perfil_cliente():
+    """Valida actualización de identificación y datos del perfil mediante PATCH /clientes/{id} y PATCH /clientes/me."""
+    unique_suffix = uuid.uuid4().hex[:6]
+    orig_ident = f"10{uuid.uuid4().int % 100000000:08d}"
+    cliente_res = client.post("/auth/register", json={
+        "Nombres": "Carlos",
+        "Apellidos": "Andrade",
+        "Email": f"carlos_{unique_suffix}@tecnomega.com",
+        "Password": "Password123!",
+        "Identificacion": orig_ident,
+    })
+    assert cliente_res.status_code == 201
+    cli_data = cliente_res.json()["usuario"]
+    cli_token = cliente_res.json()["access_token"]
+    cliente_id = cli_data["ClienteId"]
+    headers = {"Authorization": f"Bearer {cli_token}"}
+
+    # 1. Actualizar identificación y nombres mediante PATCH /clientes/{cliente_id}
+    nueva_ident = f"11{uuid.uuid4().int % 100000000:08d}"
+    patch_res = client.patch(f"/clientes/{cliente_id}", headers=headers, json={
+        "Identificacion": nueva_ident,
+        "Nombres": "Carlos Alberto",
+        "Telefono": "0987654321",
+    })
+    assert patch_res.status_code == 200
+    updated_data = patch_res.json()
+    assert updated_data["Identificacion"] == nueva_ident
+    assert updated_data["Nombres"] == "Carlos Alberto"
+    assert updated_data["Telefono"] == "0987654321"
+
+    # Verificar que /auth/me refleja la nueva identificación
+    me_res = client.get("/auth/me", headers=headers)
+    assert me_res.status_code == 200
+    assert me_res.json()["Identificacion"] == nueva_ident
+
+    # 2. Actualizar identificación mediante PATCH /clientes/me con alias en minúsculas (identificacion)
+    otra_ident = f"12{uuid.uuid4().int % 100000000:08d}"
+    patch_me_res = client.patch("/clientes/me", headers=headers, json={
+        "identificacion": otra_ident,
+        "nombres": "Carlos Roberto",
+    })
+    assert patch_me_res.status_code == 200
+    assert patch_me_res.json()["Identificacion"] == otra_ident
+    assert patch_me_res.json()["Nombres"] == "Carlos Roberto"
+
+    # 3. Registrar un segundo cliente con identificación propia
+    segundo_ident = f"99{uuid.uuid4().int % 100000000:08d}"
+    client.post("/auth/register", json={
+        "Nombres": "Segundo",
+        "Apellidos": "Cliente",
+        "Email": f"segundo_{unique_suffix}@tecnomega.com",
+        "Password": "Password123!",
+        "Identificacion": segundo_ident,
+    })
+
+    # 4. Intentar actualizar a la identificación del segundo cliente -> Debe responder 409 Conflict
+    dup_res = client.patch(f"/clientes/{cliente_id}", headers=headers, json={
+        "Identificacion": segundo_ident,
+    })
+    assert dup_res.status_code == 409
+
+
 # ------------------------------------------------------------
 # 5. CARRITO DE COMPRAS
 # ------------------------------------------------------------
@@ -362,17 +424,50 @@ def test_favoritos_y_resenas():
     assert list_fav.status_code == 200
     assert any(f["ProductoId"] == prod_id for f in list_fav.json())
 
-    # Agregar reseña
+    # Agregar reseña inicial
     review_res = client.post(f"/productos/{prod_id}/resenas", headers=headers, json={
         "Calificacion": 5,
         "Comentario": "Excelente producto, 100% recomendado.",
     })
-    assert review_res.status_code == 201
+    assert review_res.status_code in (200, 201)
+    resena_id = review_res.json()["ResenaId"]
+    assert resena_id > 0
 
     # Consultar reseñas del producto
     reviews_get = client.get(f"/productos/{prod_id}/resenas")
     assert reviews_get.status_code == 200
     assert reviews_get.json()["TotalResenas"] >= 1
+
+    # Consultar mi reseña específica
+    my_review_get = client.get(f"/productos/{prod_id}/resenas/me", headers=headers)
+    assert my_review_get.status_code == 200
+    assert my_review_get.json()["Calificacion"] == 5
+
+    # Recalificar / actualizar reseña mediante PUT en ruta de producto
+    put_res = client.put(f"/productos/{prod_id}/resenas", headers=headers, json={
+        "Calificacion": 4,
+        "Comentario": "Actualización: Muy bueno, pero llegó con un día de retraso.",
+    })
+    assert put_res.status_code == 200
+    assert put_res.json()["Calificacion"] == 4
+    assert put_res.json()["ResenaId"] == resena_id
+
+    # Actualizar reseña mediante PATCH por ID de reseña
+    patch_res = client.patch(f"/resenas/{resena_id}", headers=headers, json={
+        "calificacion": 3,
+        "comentario": "Actualización final de reseña.",
+    })
+    assert patch_res.status_code == 200
+    assert patch_res.json()["Calificacion"] == 3
+
+    # Enviar nuevo POST del mismo usuario para el mismo producto -> debe actualizar en lugar de duplicar
+    post_again = client.post(f"/productos/{prod_id}/resenas", headers=headers, json={
+        "Calificacion": 5,
+        "Comentario": "El soporte me atendió excelente, cambio a 5 estrellas.",
+    })
+    assert post_again.status_code in (200, 201)
+    assert post_again.json()["ResenaId"] == resena_id
+    assert post_again.json()["Calificacion"] == 5
 
 
 # ------------------------------------------------------------

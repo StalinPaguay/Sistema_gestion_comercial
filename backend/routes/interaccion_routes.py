@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from config.database import get_db
@@ -26,8 +26,36 @@ router = APIRouter(
 # ============================================================
 
 class ResenaEntrada(BaseModel):
-    Calificacion: int = Field(ge=1, le=5, description="Puntuación de 1 a 5 estrellas")
-    Comentario: str | None = Field(default=None, max_length=1000, description="Opinión del producto")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+    Calificacion: int = Field(
+        ge=1,
+        le=5,
+        description="Puntuación de 1 a 5 estrellas",
+        validation_alias=AliasChoices("Calificacion", "calificacion", "rating"),
+    )
+    Comentario: str | None = Field(
+        default=None,
+        max_length=1000,
+        description="Opinión del producto",
+        validation_alias=AliasChoices("Comentario", "comentario", "comment"),
+    )
+
+
+class ResenaActualizacion(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+    Calificacion: int | None = Field(
+        default=None,
+        ge=1,
+        le=5,
+        description="Puntuación de 1 a 5 estrellas",
+        validation_alias=AliasChoices("Calificacion", "calificacion", "rating"),
+    )
+    Comentario: str | None = Field(
+        default=None,
+        max_length=1000,
+        description="Opinión del producto",
+        validation_alias=AliasChoices("Comentario", "comentario", "comment"),
+    )
 
 
 # ============================================================
@@ -163,6 +191,27 @@ def agregar_resena(
     if not producto or not producto.Estado:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Producto no encontrado o inactivo.")
 
+    # Si el usuario ya calificó este producto, actualizamos la reseña existente
+    resena = (
+        db.query(Resena)
+        .filter(Resena.UsuarioId == usuario.UsuarioId, Resena.ProductoId == producto_id)
+        .first()
+    )
+    if resena:
+        resena.Calificacion = datos.Calificacion
+        resena.Comentario = datos.Comentario
+        resena.Fecha = datetime.now()
+        resena.Estado = True
+        db.commit()
+        db.refresh(resena)
+        return {
+            "ResenaId": resena.ResenaId,
+            "ProductoId": resena.ProductoId,
+            "Calificacion": resena.Calificacion,
+            "Comentario": resena.Comentario,
+            "Fecha": resena.Fecha.isoformat(),
+        }
+
     resena = Resena(
         UsuarioId=usuario.UsuarioId,
         ProductoId=producto_id,
@@ -182,3 +231,137 @@ def agregar_resena(
         "Comentario": resena.Comentario,
         "Fecha": resena.Fecha.isoformat(),
     }
+
+
+@router.put("/productos/{producto_id}/resenas", summary="Actualizar o recalificar reseña de un producto")
+@router.patch("/productos/{producto_id}/resenas", summary="Actualizar o recalificar reseña de un producto")
+def actualizar_resena_producto(
+    producto_id: int,
+    datos: ResenaActualizacion,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+):
+    producto = db.get(Producto, producto_id)
+    if not producto or not producto.Estado:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Producto no encontrado o inactivo.")
+
+    resena = (
+        db.query(Resena)
+        .filter(Resena.UsuarioId == usuario.UsuarioId, Resena.ProductoId == producto_id)
+        .first()
+    )
+    if not resena:
+        if datos.Calificacion is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Debe proporcionar una calificación de 1 a 5 estrellas para crear la reseña.",
+            )
+        resena = Resena(
+            UsuarioId=usuario.UsuarioId,
+            ProductoId=producto_id,
+            Calificacion=datos.Calificacion,
+            Comentario=datos.Comentario,
+            Fecha=datetime.now(),
+            Estado=True,
+        )
+        db.add(resena)
+    else:
+        if datos.Calificacion is not None:
+            resena.Calificacion = datos.Calificacion
+        if datos.Comentario is not None:
+            resena.Comentario = datos.Comentario
+        resena.Fecha = datetime.now()
+        resena.Estado = True
+
+    db.commit()
+    db.refresh(resena)
+
+    return {
+        "ResenaId": resena.ResenaId,
+        "ProductoId": resena.ProductoId,
+        "Calificacion": resena.Calificacion,
+        "Comentario": resena.Comentario,
+        "Fecha": resena.Fecha.isoformat(),
+    }
+
+
+@router.get("/productos/{producto_id}/resenas/me", summary="Obtener mi reseña de un producto")
+def obtener_mi_resena_producto(
+    producto_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+):
+    resena = (
+        db.query(Resena)
+        .filter(Resena.UsuarioId == usuario.UsuarioId, Resena.ProductoId == producto_id, Resena.Estado == True)
+        .first()
+    )
+    if not resena:
+        return {"resena": None}
+
+    return {
+        "ResenaId": resena.ResenaId,
+        "ProductoId": resena.ProductoId,
+        "Calificacion": resena.Calificacion,
+        "Comentario": resena.Comentario,
+        "Fecha": resena.Fecha.isoformat(),
+    }
+
+
+@router.put("/resenas/{resena_id}", summary="Actualizar reseña por ID")
+@router.patch("/resenas/{resena_id}", summary="Actualizar reseña por ID")
+def actualizar_resena_por_id(
+    resena_id: int,
+    datos: ResenaActualizacion,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+):
+    resena = db.get(Resena, resena_id)
+    if not resena or not resena.Estado:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reseña no encontrada.")
+
+    es_admin = bool(usuario.Rol and usuario.Rol.Nombre in ("Administrador", "Admin"))
+    if resena.UsuarioId != usuario.UsuarioId and not es_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permiso para modificar esta reseña.",
+        )
+
+    if datos.Calificacion is not None:
+        resena.Calificacion = datos.Calificacion
+    if datos.Comentario is not None:
+        resena.Comentario = datos.Comentario
+
+    resena.Fecha = datetime.now()
+    db.commit()
+    db.refresh(resena)
+
+    return {
+        "ResenaId": resena.ResenaId,
+        "ProductoId": resena.ProductoId,
+        "Calificacion": resena.Calificacion,
+        "Comentario": resena.Comentario,
+        "Fecha": resena.Fecha.isoformat(),
+    }
+
+
+@router.delete("/resenas/{resena_id}", summary="Eliminar reseña por ID")
+def eliminar_resena_por_id(
+    resena_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+):
+    resena = db.get(Resena, resena_id)
+    if not resena:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reseña no encontrada.")
+
+    es_admin = bool(usuario.Rol and usuario.Rol.Nombre in ("Administrador", "Admin"))
+    if resena.UsuarioId != usuario.UsuarioId and not es_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permiso para eliminar esta reseña.",
+        )
+
+    resena.Estado = False
+    db.commit()
+    return {"message": "Reseña eliminada correctamente."}
