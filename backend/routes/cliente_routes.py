@@ -131,13 +131,14 @@ def listar_clientes(
     _user: Any = Depends(get_current_user),
 ):
     query = db.query(Cliente).join(Persona)
-    if buscar:
-        termino = f"%{buscar}%"
+    if buscar and buscar.strip():
+        limpio = buscar.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        termino = f"%{limpio}%"
         query = query.filter(
-            (Cliente.Identificacion.ilike(termino))
-            | (Persona.Nombres.ilike(termino))
-            | (Persona.Apellidos.ilike(termino))
-            | (Persona.Email.ilike(termino))
+            (Cliente.Identificacion.ilike(termino, escape="\\"))
+            | (Persona.Nombres.ilike(termino, escape="\\"))
+            | (Persona.Apellidos.ilike(termino, escape="\\"))
+            | (Persona.Email.ilike(termino, escape="\\"))
         )
 
     total = query.count()

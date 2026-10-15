@@ -71,12 +71,13 @@ def listar_proveedores(
     query = db.query(Proveedor)
     if not incluir_inactivos:
         query = query.filter(Proveedor.Estado == True)
-    if buscar:
-        termino = f"%{buscar}%"
+    if buscar and buscar.strip():
+        limpio = buscar.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        termino = f"%{limpio}%"
         query = query.filter(
-            (Proveedor.NombreEmpresa.ilike(termino))
-            | (Proveedor.RUC.ilike(termino))
-            | (Proveedor.Contacto.ilike(termino))
+            (Proveedor.NombreEmpresa.ilike(termino, escape="\\"))
+            | (Proveedor.RUC.ilike(termino, escape="\\"))
+            | (Proveedor.Contacto.ilike(termino, escape="\\"))
         )
 
     total = query.count()

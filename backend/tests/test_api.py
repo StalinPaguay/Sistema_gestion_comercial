@@ -592,3 +592,107 @@ def test_flujo_integral_pedido_descuento_factura_pago():
     # 6. Validar que la factura ahora esté Pagada
     factura_final = client.get(f"/facturas/{factura_id}", headers=headers_admin).json()
     assert factura_final["Estado"] == "Pagada"
+
+
+# ------------------------------------------------------------
+# 10. AUDITORÍA Y REGRESIÓN DE ERRORES ERR-001 AL ERR-005
+# ------------------------------------------------------------
+
+def test_err001_y_err004_excepciones_y_respuestas_estandar():
+    """Valida control de excepciones en base de datos y formato estándar de errores JSON."""
+    # ERR-001: Verificación de base de datos con respuesta estructurada
+    db_res = client.get("/database")
+    assert db_res.status_code == 200
+    db_json = db_res.json()
+    assert db_json["estado"] == "Conectado"
+    assert db_json["base_de_datos"] == "TECNOMEGA"
+
+    # ERR-004: Respuesta estándar ante recurso no encontrado (HTTP 404)
+    res_404 = client.get("/productos/99999999")
+    assert res_404.status_code == 404
+    data_404 = res_404.json()
+    assert data_404["error"] is True
+    assert data_404["status_code"] == 404
+    assert "detail" in data_404
+    assert "mensaje" in data_404
+
+    # ERR-003 & ERR-004: Respuesta estándar ante validación Pydantic (HTTP 422)
+    admin_login = client.post("/auth/login", json={"Email": "admin@tecnomega.com", "Password": "Admin123!"})
+    token = admin_login.json()["access_token"]
+    res_422 = client.post("/carrito/items", headers={"Authorization": f"Bearer {token}"}, json={
+        "ProductoId": -10,
+        "Cantidad": -5,
+    })
+    assert res_422.status_code == 422
+    data_422 = res_422.json()
+    assert data_422["error"] is True
+    assert data_422["status_code"] == 422
+    assert "detail" in data_422
+
+
+def test_err002_atomicidad_acid_sin_registros_huerfanos():
+    """Valida atomicidad ACID: si falla la validación de un pedido, la transacción se revierte por completo."""
+    unique_suffix = uuid.uuid4().hex[:6]
+    cliente_res = client.post("/auth/register", json={
+        "Nombres": "Test",
+        "Apellidos": "ACID",
+        "Email": f"acid_{unique_suffix}@tecnomega.com",
+        "Password": "Password123!",
+        "Identificacion": f"98{uuid.uuid4().int % 100000000:08d}",
+    })
+    token = cliente_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Crear dirección
+    dir_res = client.post("/clientes/me/direcciones", headers=headers, json={
+        "Direccion": "Calle Transaccional 123",
+        "Ciudad": "Quito",
+    })
+    dir_id = dir_res.json()["DireccionId"]
+
+    # Intentar crear un pedido solicitando stock astronómico (debe fallar 400 y hacer rollback)
+    fail_res = client.post("/pedidos", headers=headers, json={
+        "DireccionId": dir_id,
+        "Items": [{"ProductoId": 1, "Cantidad": 9999999}],
+    })
+    assert fail_res.status_code == 400
+
+    # Comprobar que no existe ningún pedido huérfano registrado
+    pedidos_res = client.get("/pedidos", headers=headers)
+    assert pedidos_res.status_code == 200
+    assert len(pedidos_res.json()["pedidos"]) == 0
+
+
+def test_err005_paginacion_y_sanitizacion_wildcards():
+    """Valida paginación en categorías, marcas y promociones, y sanitización de caracteres comodín SQL."""
+    # Paginación en Categorías
+    cat_res = client.get("/categorias?limite=2&desde=0")
+    assert cat_res.status_code == 200
+    cat_data = cat_res.json()
+    assert cat_data["limite"] == 2
+    assert cat_data["desde"] == 0
+    assert len(cat_data["categorias"]) <= 2
+    assert cat_data["total"] >= 1
+
+    # Paginación en Marcas
+    marca_res = client.get("/marcas?limite=2&desde=0")
+    assert marca_res.status_code == 200
+    marca_data = marca_res.json()
+    assert marca_data["limite"] == 2
+    assert marca_data["desde"] == 0
+    assert len(marca_data["marcas"]) <= 2
+    assert marca_data["total"] >= 1
+
+    # Paginación en Promociones
+    promo_res = client.get("/promociones?limite=2&desde=0")
+    assert promo_res.status_code == 200
+    assert isinstance(promo_res.json(), list)
+    assert len(promo_res.json()) <= 2
+
+    # Sanitización de caracteres comodín de SQL (%, _, \) en búsqueda
+    admin_login = client.post("/auth/login", json={"Email": "admin@tecnomega.com", "Password": "Admin123!"})
+    token = admin_login.json()["access_token"]
+    busqueda_res = client.get("/clientes?buscar=%25%25%5C%5F%5F", headers={"Authorization": f"Bearer {token}"})
+    assert busqueda_res.status_code == 200
+    assert "clientes" in busqueda_res.json()
+

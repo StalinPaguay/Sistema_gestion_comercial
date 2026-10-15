@@ -2,8 +2,11 @@
 # TECNOMEGA - API PRINCIPAL (FASTAPI)
 # ============================================================
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 
 from routes.auth_routes import router as auth_router
 from routes.carrito_routes import router as carrito_router
@@ -31,6 +34,76 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ============================================================
+# MANEJADORES GLOBALES DE EXCEPCIONES Y RESPUESTAS ESTÁNDAR
+# ============================================================
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Estandariza respuestas HTTP controladas preservando 'detail' para compatibilidad frontend."""
+    mensaje = exc.detail if isinstance(exc.detail, str) else "Error en la petición."
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": True,
+            "status_code": exc.status_code,
+            "mensaje": mensaje,
+            "detail": exc.detail,
+        },
+        headers=getattr(exc, "headers", None),
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Captura errores de validación de esquemas Pydantic y formatea una respuesta limpia."""
+    errores = exc.errors()
+    detalles = [
+        f"{'.'.join(str(loc) for loc in err.get('loc', []))}: {err.get('msg', '')}"
+        for err in errores
+    ]
+    mensaje_resumen = "; ".join(detalles) if detalles else "Parámetros de entrada no válidos."
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "error": True,
+            "status_code": status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "mensaje": mensaje_resumen,
+            "detail": mensaje_resumen,
+            "errores": errores,
+        },
+    )
+
+
+@app.exception_handler(SQLAlchemyError)
+async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
+    """Captura excepciones de base de datos protegiendo datos sensibles internos."""
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "error": True,
+            "status_code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "mensaje": "Error en la base de datos al procesar la operación.",
+            "detail": "Error en la base de datos al procesar la operación.",
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    """Manejador general para excepciones imprevistas no capturadas."""
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "error": True,
+            "status_code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "mensaje": "Error interno del servidor. Por favor, intente más tarde.",
+            "detail": "Error interno del servidor. Por favor, intente más tarde.",
+        },
+    )
+
 
 # Registro de routers por módulo
 app.include_router(database_router)

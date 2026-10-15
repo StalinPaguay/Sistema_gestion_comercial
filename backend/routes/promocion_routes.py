@@ -86,6 +86,8 @@ def serializar_promocion(p: Promocion, db: Session) -> dict[str, Any]:
 
 @router.get("", summary="Listar promociones")
 def listar_promociones(
+    limite: int = Query(default=50, ge=1, le=200),
+    desde: int = Query(default=0, ge=0),
     incluir_inactivas: bool = Query(default=False),
     db: Session = Depends(get_db),
 ):
@@ -98,7 +100,7 @@ def listar_promociones(
             Promocion.FechaFin >= now,
         )
 
-    promos = query.order_by(Promocion.PromocionId.desc()).all()
+    promos = query.order_by(Promocion.PromocionId.desc()).offset(desde).limit(limite).all()
     return [serializar_promocion(p, db) for p in promos]
 
 
@@ -131,8 +133,9 @@ def crear_promocion(
             detail="El porcentaje de descuento no puede ser superior al 100%.",
         )
 
-    if datos.CodigoCupon:
-        existe = db.query(Promocion).filter(Promocion.CodigoCupon == datos.CodigoCupon).first()
+    codigo_limpio = datos.CodigoCupon.strip().upper() if datos.CodigoCupon else None
+    if codigo_limpio:
+        existe = db.query(Promocion).filter(Promocion.CodigoCupon == codigo_limpio).first()
         if existe:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -141,8 +144,8 @@ def crear_promocion(
 
     try:
         promo = Promocion(
-            Nombre=datos.Nombre,
-            CodigoCupon=datos.CodigoCupon.strip().upper() if datos.CodigoCupon else None,
+            Nombre=datos.Nombre.strip(),
+            CodigoCupon=codigo_limpio,
             TipoDescuento=datos.TipoDescuento,
             ValorDescuento=datos.ValorDescuento,
             MontoMinimoCompra=datos.MontoMinimoCompra,
@@ -165,6 +168,9 @@ def crear_promocion(
         db.refresh(promo)
         return serializar_promocion(promo, db)
 
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as error:
         db.rollback()
         raise HTTPException(

@@ -39,25 +39,29 @@ class ItemCarritoActualizacion(BaseModel):
 
 def obtener_o_crear_carrito(db: Session, usuario: Usuario) -> Carrito:
     """Obtiene el carrito activo del cliente o lo crea si no existe."""
-    cliente = db.query(Cliente).filter(Cliente.PersonaId == usuario.PersonaId).first()
-    if not cliente:
-        # Si el usuario no tiene ficha de cliente, la creamos automáticamente
-        cliente = Cliente(
-            PersonaId=usuario.PersonaId,
-            Identificacion=f"CLI-{usuario.UsuarioId:06d}",
-            Estado=True,
-        )
-        db.add(cliente)
-        db.flush()
+    try:
+        cliente = db.query(Cliente).filter(Cliente.PersonaId == usuario.PersonaId).first()
+        if not cliente:
+            # Si el usuario no tiene ficha de cliente, la creamos automáticamente
+            cliente = Cliente(
+                PersonaId=usuario.PersonaId,
+                Identificacion=f"CLI-{usuario.UsuarioId:06d}",
+                Estado=True,
+            )
+            db.add(cliente)
+            db.flush()
 
-    carrito = db.query(Carrito).filter(Carrito.ClienteId == cliente.ClienteId).first()
-    if not carrito:
-        carrito = Carrito(ClienteId=cliente.ClienteId, FechaActualizacion=datetime.now())
-        db.add(carrito)
-        db.commit()
-        db.refresh(carrito)
+        carrito = db.query(Carrito).filter(Carrito.ClienteId == cliente.ClienteId).first()
+        if not carrito:
+            carrito = Carrito(ClienteId=cliente.ClienteId, FechaActualizacion=datetime.now())
+            db.add(carrito)
+            db.commit()
+            db.refresh(carrito)
 
-    return carrito
+        return carrito
+    except Exception:
+        db.rollback()
+        raise
 
 
 def serializar_carrito(carrito: Carrito) -> dict[str, Any]:
@@ -137,19 +141,26 @@ def agregar_item(
                 detail=f"Stock insuficiente para agregar más. Total en carrito superaría las {producto.Stock} unidades.",
             )
         detalle.Cantidad = nueva_cantidad
-    else:
-        detalle = DetalleCarrito(
-            CarritoId=carrito.CarritoId,
-            ProductoId=datos.ProductoId,
-            Cantidad=datos.Cantidad,
-        )
-        db.add(detalle)
+    try:
+        if not detalle:
+            detalle = DetalleCarrito(
+                CarritoId=carrito.CarritoId,
+                ProductoId=datos.ProductoId,
+                Cantidad=datos.Cantidad,
+            )
+            db.add(detalle)
 
-    carrito.FechaActualizacion = datetime.now()
-    db.commit()
-    db.refresh(carrito)
+        carrito.FechaActualizacion = datetime.now()
+        db.commit()
+        db.refresh(carrito)
 
-    return serializar_carrito(carrito)
+        return serializar_carrito(carrito)
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al agregar producto al carrito: {str(error)}",
+        ) from error
 
 
 @router.patch("/items/{detalle_id}", summary="Actualizar cantidad de un item")
@@ -171,12 +182,19 @@ def actualizar_item(
             detail=f"Stock insuficiente. Solo quedan {producto.Stock} unidades disponibles.",
         )
 
-    detalle.Cantidad = datos.Cantidad
-    carrito.FechaActualizacion = datetime.now()
-    db.commit()
-    db.refresh(carrito)
+    try:
+        detalle.Cantidad = datos.Cantidad
+        carrito.FechaActualizacion = datetime.now()
+        db.commit()
+        db.refresh(carrito)
 
-    return serializar_carrito(carrito)
+        return serializar_carrito(carrito)
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al actualizar item del carrito: {str(error)}",
+        ) from error
 
 
 @router.delete("/items/{detalle_id}", summary="Eliminar item del carrito")
@@ -190,12 +208,19 @@ def eliminar_item(
     if not detalle or detalle.CarritoId != carrito.CarritoId:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item no encontrado en su carrito.")
 
-    db.delete(detalle)
-    carrito.FechaActualizacion = datetime.now()
-    db.commit()
-    db.refresh(carrito)
+    try:
+        db.delete(detalle)
+        carrito.FechaActualizacion = datetime.now()
+        db.commit()
+        db.refresh(carrito)
 
-    return serializar_carrito(carrito)
+        return serializar_carrito(carrito)
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al eliminar item del carrito: {str(error)}",
+        ) from error
 
 
 @router.delete("", summary="Vaciar carrito de compras")
@@ -204,9 +229,16 @@ def vaciar_carrito(
     usuario: Usuario = Depends(get_current_user),
 ):
     carrito = obtener_o_crear_carrito(db, usuario)
-    db.query(DetalleCarrito).filter(DetalleCarrito.CarritoId == carrito.CarritoId).delete()
-    carrito.FechaActualizacion = datetime.now()
-    db.commit()
-    db.refresh(carrito)
+    try:
+        db.query(DetalleCarrito).filter(DetalleCarrito.CarritoId == carrito.CarritoId).delete()
+        carrito.FechaActualizacion = datetime.now()
+        db.commit()
+        db.refresh(carrito)
 
-    return serializar_carrito(carrito)
+        return serializar_carrito(carrito)
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al vaciar el carrito: {str(error)}",
+        ) from error

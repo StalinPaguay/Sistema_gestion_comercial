@@ -617,24 +617,31 @@ def eliminar_producto(
 
 @router.get("/categorias")
 def listar_categorias(
+    limite: int = Query(default=100, ge=1, le=500),
+    desde: int = Query(default=0, ge=0),
     incluir_inactivas: bool = Query(default=False),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    """Lista las categorías activas por defecto."""
+    """Lista las categorías con soporte de paginación."""
 
     consulta = db.query(Categoria)
 
     if not incluir_inactivas:
         consulta = consulta.filter(Categoria.Estado == True)  # noqa: E712
 
+    total = consulta.count()
     categorias = (
         consulta
         .order_by(Categoria.CategoriaId)
+        .offset(desde)
+        .limit(limite)
         .all()
     )
 
     return {
-        "total": len(categorias),
+        "total": total,
+        "limite": limite,
+        "desde": desde,
         "categorias": [
             categoria_json(categoria)
             for categoria in categorias
@@ -760,24 +767,31 @@ def eliminar_categoria(
 
 @router.get("/marcas")
 def listar_marcas(
+    limite: int = Query(default=100, ge=1, le=500),
+    desde: int = Query(default=0, ge=0),
     incluir_inactivas: bool = Query(default=False),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    """Lista las marcas activas por defecto."""
+    """Lista las marcas con soporte de paginación."""
 
     consulta = db.query(Marca)
 
     if not incluir_inactivas:
         consulta = consulta.filter(Marca.Estado == True)  # noqa: E712
 
+    total = consulta.count()
     marcas = (
         consulta
         .order_by(Marca.MarcaId)
+        .offset(desde)
+        .limit(limite)
         .all()
     )
 
     return {
-        "total": len(marcas),
+        "total": total,
+        "limite": limite,
+        "desde": desde,
         "marcas": [
             marca_json(marca)
             for marca in marcas

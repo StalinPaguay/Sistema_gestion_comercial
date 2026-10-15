@@ -175,111 +175,112 @@ def crear_pedido(
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(get_current_user),
 ):
-    # 1. Obtener o verificar Cliente
-    cliente = db.query(Cliente).filter(Cliente.PersonaId == usuario.PersonaId).first()
-    if not cliente:
-        cliente = Cliente(
-            PersonaId=usuario.PersonaId,
-            Identificacion=f"CLI-{usuario.UsuarioId:06d}",
-            Estado=True,
-        )
-        db.add(cliente)
-        db.flush()
-
-    # 2. Validar que la dirección pertenezca al cliente
-    direccion = db.get(DireccionCliente, datos.DireccionId)
-    if not direccion or direccion.ClienteId != cliente.ClienteId:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La dirección seleccionada no pertenece al cliente.",
-        )
-
-    # 3. Determinar items (directos o desde el carrito)
-    items_a_procesar: list[tuple[int, int]] = []
-    desde_carrito = False
-
-    if datos.Items and len(datos.Items) > 0:
-        for it in datos.Items:
-            items_a_procesar.append((it.ProductoId, it.Cantidad))
-    else:
-        # Tomar del carrito
-        carrito = db.query(Carrito).filter(Carrito.ClienteId == cliente.ClienteId).first()
-        if not carrito or not carrito.Detalles:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El carrito de compras está vacío. Agregue productos o especifique items.",
-            )
-        for d in carrito.Detalles:
-            items_a_procesar.append((d.ProductoId, d.Cantidad))
-        desde_carrito = True
-
-    # 4. Validar stock de cada producto
-    detalles_para_crear = []
-    subtotal_calculado = Decimal("0.00")
-
-    for prod_id, cant in items_a_procesar:
-        prod = db.get(Producto, prod_id)
-        if not prod or not prod.Estado:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Producto #{prod_id} no encontrado o inactivo.")
-        if prod.Stock < cant:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Stock insuficiente para '{prod.Nombre}'. Disponibles: {prod.Stock}, solicitados: {cant}.",
-            )
-        subtotal_linea = prod.Precio * cant
-        subtotal_calculado += subtotal_linea
-        detalles_para_crear.append((prod, cant, subtotal_linea))
-
-    # 5. Validar y calcular descuento promocional si aplica
-    promocion_aplicada = None
-    if datos.CodigoCupon or datos.PromocionId:
-        query_promo = db.query(Promocion).filter(Promocion.Estado == True)
-        if datos.CodigoCupon:
-            query_promo = query_promo.filter(Promocion.CodigoCupon == datos.CodigoCupon.strip().upper())
-        elif datos.PromocionId:
-            query_promo = query_promo.filter(Promocion.PromocionId == datos.PromocionId)
-        promocion_aplicada = query_promo.first()
-
-        now = datetime.now()
-        if not promocion_aplicada:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cupón o promoción no encontrada o inactiva.")
-        if now < promocion_aplicada.FechaInicio or now > promocion_aplicada.FechaFin:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La promoción está fuera de su período de vigencia.")
-        if subtotal_calculado < promocion_aplicada.MontoMinimoCompra:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"El subtotal (${subtotal_calculado}) no alcanza el monto mínimo de la promoción (${promocion_aplicada.MontoMinimoCompra}).",
-            )
-
-    descuentos_lineas: dict[int, Decimal] = {}
-    if promocion_aplicada:
-        prods_promo = [x.ProductoId for x in db.query(PromocionProducto).filter(PromocionProducto.PromocionId == promocion_aplicada.PromocionId).all()]
-        cats_promo = [x.CategoriaId for x in db.query(PromocionCategoria).filter(PromocionCategoria.PromocionId == promocion_aplicada.PromocionId).all()]
-
-        items_calificantes = []
-        subtotal_calificante = Decimal("0.00")
-        for prod, cant, subtotal_linea in detalles_para_crear:
-            aplica = True
-            if prods_promo and prod.ProductoId not in prods_promo:
-                aplica = False
-            if cats_promo and prod.CategoriaId not in cats_promo:
-                aplica = False
-            if aplica:
-                items_calificantes.append((prod, cant, subtotal_linea))
-                subtotal_calificante += subtotal_linea
-
-        if promocion_aplicada.TipoDescuento == "PORCENTAJE":
-            pct = promocion_aplicada.ValorDescuento / Decimal("100.0")
-            for prod, cant, subtotal_linea in items_calificantes:
-                desc = round(subtotal_linea * pct, 2)
-                descuentos_lineas[prod.ProductoId] = desc
-        elif promocion_aplicada.TipoDescuento == "MONTO_FIJO" and subtotal_calificante > 0:
-            monto_fijo = min(promocion_aplicada.ValorDescuento, subtotal_calificante)
-            for prod, cant, subtotal_linea in items_calificantes:
-                desc = min(round((subtotal_linea / subtotal_calificante) * monto_fijo, 2), subtotal_linea)
-                descuentos_lineas[prod.ProductoId] = desc
-
     try:
+        # 1. Obtener o verificar Cliente
+        cliente = db.query(Cliente).filter(Cliente.PersonaId == usuario.PersonaId).first()
+        if not cliente:
+            cliente = Cliente(
+                PersonaId=usuario.PersonaId,
+                Identificacion=f"CLI-{usuario.UsuarioId:06d}",
+                Estado=True,
+            )
+            db.add(cliente)
+            db.flush()
+
+        # 2. Validar que la dirección pertenezca al cliente
+        direccion = db.get(DireccionCliente, datos.DireccionId)
+        if not direccion or direccion.ClienteId != cliente.ClienteId:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La dirección seleccionada no pertenece al cliente.",
+            )
+
+        # 3. Determinar items (directos o desde el carrito)
+        items_a_procesar: list[tuple[int, int]] = []
+        desde_carrito = False
+
+        if datos.Items and len(datos.Items) > 0:
+            for it in datos.Items:
+                items_a_procesar.append((it.ProductoId, it.Cantidad))
+        else:
+            # Tomar del carrito
+            carrito = db.query(Carrito).filter(Carrito.ClienteId == cliente.ClienteId).first()
+            if not carrito or not carrito.Detalles:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="El carrito de compras está vacío. Agregue productos o especifique items.",
+                )
+            for d in carrito.Detalles:
+                items_a_procesar.append((d.ProductoId, d.Cantidad))
+            desde_carrito = True
+
+        # 4. Validar stock de cada producto
+        detalles_para_crear = []
+        subtotal_calculado = Decimal("0.00")
+
+        for prod_id, cant in items_a_procesar:
+            prod = db.get(Producto, prod_id)
+            if not prod or not prod.Estado:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Producto #{prod_id} no encontrado o inactivo.")
+            if prod.Stock < cant:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Stock insuficiente para '{prod.Nombre}'. Disponibles: {prod.Stock}, solicitados: {cant}.",
+                )
+            subtotal_linea = prod.Precio * cant
+            subtotal_calculado += subtotal_linea
+            detalles_para_crear.append((prod, cant, subtotal_linea))
+
+        # 5. Validar y calcular descuento promocional si aplica
+        promocion_aplicada = None
+        if datos.CodigoCupon or datos.PromocionId:
+            query_promo = db.query(Promocion).filter(Promocion.Estado == True)
+            if datos.CodigoCupon:
+                query_promo = query_promo.filter(Promocion.CodigoCupon == datos.CodigoCupon.strip().upper())
+            elif datos.PromocionId:
+                query_promo = query_promo.filter(Promocion.PromocionId == datos.PromocionId)
+            promocion_aplicada = query_promo.first()
+
+            now = datetime.now()
+            if not promocion_aplicada:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cupón o promoción no encontrada o inactiva.")
+            if now < promocion_aplicada.FechaInicio or now > promocion_aplicada.FechaFin:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La promoción está fuera de su período de vigencia.")
+            if subtotal_calculado < promocion_aplicada.MontoMinimoCompra:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"El subtotal (${subtotal_calculado}) no alcanza el monto mínimo de la promoción (${promocion_aplicada.MontoMinimoCompra}).",
+                )
+
+        descuentos_lineas: dict[int, Decimal] = {}
+        if promocion_aplicada:
+            prods_promo = [x.ProductoId for x in db.query(PromocionProducto).filter(PromocionProducto.PromocionId == promocion_aplicada.PromocionId).all()]
+            cats_promo = [x.CategoriaId for x in db.query(PromocionCategoria).filter(PromocionCategoria.PromocionId == promocion_aplicada.PromocionId).all()]
+
+            items_calificantes = []
+            subtotal_calificante = Decimal("0.00")
+
+            for prod, cant, subtotal_linea in detalles_para_crear:
+                aplica = True
+                if prods_promo and prod.ProductoId not in prods_promo:
+                    aplica = False
+                if cats_promo and prod.CategoriaId not in cats_promo:
+                    aplica = False
+                if aplica:
+                    items_calificantes.append((prod, cant, subtotal_linea))
+                    subtotal_calificante += subtotal_linea
+
+            if promocion_aplicada.TipoDescuento == "PORCENTAJE":
+                pct = promocion_aplicada.ValorDescuento / Decimal("100.0")
+                for prod, cant, subtotal_linea in items_calificantes:
+                    desc = round(subtotal_linea * pct, 2)
+                    descuentos_lineas[prod.ProductoId] = desc
+            elif promocion_aplicada.TipoDescuento == "MONTO_FIJO" and subtotal_calificante > 0:
+                monto_fijo = min(promocion_aplicada.ValorDescuento, subtotal_calificante)
+                for prod, cant, subtotal_linea in items_calificantes:
+                    desc = min(round((subtotal_linea / subtotal_calificante) * monto_fijo, 2), subtotal_linea)
+                    descuentos_lineas[prod.ProductoId] = desc
+
         # 6. Crear cabecera del Pedido con valores iniciales
         # El trigger TR_PedidoDetalle_ActualizarTotales recalculará automáticamente
         pedido = Pedido(
@@ -314,7 +315,7 @@ def crear_pedido(
 
         db.flush()
 
-        # 7. Si vino del carrito, vaciar el carrito
+        # 8. Si vino del carrito, vaciar el carrito
         if desde_carrito:
             carrito = db.query(Carrito).filter(Carrito.ClienteId == cliente.ClienteId).first()
             if carrito:
@@ -325,6 +326,9 @@ def crear_pedido(
 
         return serializar_pedido(pedido, db)
 
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as error:
         db.rollback()
         raise HTTPException(
