@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule, NgForm } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService, RegisterUserData } from '../../services/auth.service';
 
 @Component({
@@ -12,12 +12,13 @@ import { AuthService, RegisterUserData } from '../../services/auth.service';
 })
 export class Register {
   private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
 
   protected readonly passwordVisible = signal(false);
   protected readonly confirmPasswordVisible = signal(false);
   protected readonly feedback = signal('');
   protected readonly isSubmitting = signal(false);
-  protected readonly registrationSuccess = signal(false);
+  protected readonly registrationComplete = signal(false);
 
   protected togglePasswordVisibility(field: 'password' | 'confirmation'): void {
     if (field === 'password') {
@@ -29,7 +30,7 @@ export class Register {
   }
 
   protected onSubmit(form: NgForm): void {
-    if (form.invalid || this.isSubmitting() || this.registrationSuccess()) {
+    if (form.invalid || this.isSubmitting()) {
       return;
     }
 
@@ -53,13 +54,17 @@ export class Register {
     this.authService.register(userData).subscribe({
       next: () => {
         this.isSubmitting.set(false);
-        this.registrationSuccess.set(true);
+        this.registrationComplete.set(true);
       },
       error: (error: HttpErrorResponse) => {
         this.feedback.set(this.getErrorMessage(error));
         this.isSubmitting.set(false);
       },
     });
+  }
+
+  protected continueToStore(): void {
+    void this.router.navigate(['/products']);
   }
 
   private getErrorMessage(error: HttpErrorResponse): string {

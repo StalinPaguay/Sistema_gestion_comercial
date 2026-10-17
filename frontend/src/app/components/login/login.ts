@@ -1,9 +1,8 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService, LoginCredentials } from '../../services/auth.service';
-import { CartService } from '../../services/cart.service';
 
 @Component({
   imports: [ReactiveFormsModule, RouterLink],
@@ -15,8 +14,8 @@ export class Login implements OnInit {
   private readonly rememberedEmailKey = 'tecnomega_remembered_email';
   private readonly rememberMeKey = 'tecnomega_remember_me';
   private readonly authService = inject(AuthService);
-  private readonly cartService = inject(CartService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   protected readonly passwordVisible = signal(false);
   protected readonly feedback = signal('');
@@ -59,10 +58,12 @@ export class Login implements OnInit {
     this.isSubmitting.set(true);
     this.authService.login(credentials, formValue.remember).subscribe({
       next: () => {
-        this.cartService.reconcileGuestCart().subscribe({
-          next: () => this.finishLogin(),
-          error: () => this.finishLogin('/cart'),
-        });
+        this.isSubmitting.set(false);
+        const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+        const destination = returnUrl?.startsWith('/') && !returnUrl.startsWith('//')
+          ? returnUrl
+          : '/products';
+        void this.router.navigateByUrl(destination);
       },
       error: (error: HttpErrorResponse) => {
         const detail: unknown = error.error?.detail;
@@ -76,11 +77,6 @@ export class Login implements OnInit {
         this.isSubmitting.set(false);
       },
     });
-  }
-
-  private finishLogin(route: '/products' | '/cart' = '/products'): void {
-    this.isSubmitting.set(false);
-    void this.router.navigate([route]);
   }
 
   private readRememberedCredentials(): { email: string } | null {

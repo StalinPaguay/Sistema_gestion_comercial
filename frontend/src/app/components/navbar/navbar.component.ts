@@ -1,14 +1,6 @@
 import { CurrencyPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import {
-  Component,
-  ElementRef,
-  HostListener,
-  inject,
-  OnInit,
-  signal,
-  ViewChild,
-} from '@angular/core';
+import { Component, ElementRef, HostListener, inject, OnInit, signal, ViewChild } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { CartService } from '../../services/cart.service';
@@ -30,27 +22,21 @@ export class NavbarComponent implements OnInit {
   protected readonly favoritesService = inject(FavoritesService);
   protected readonly favoritesOpen = signal(false);
   protected readonly accountMenuOpen = signal(false);
-  protected readonly mobileMenuOpen = signal(false);
-  protected readonly minimumRatingOptions = [4, 3, 2, 1];
   protected readonly cartMessage = signal('');
+  protected readonly cartMenuOpen = signal(false);
+  protected readonly cartLoading = signal(false);
+  protected readonly cartPreviewError = signal('');
   protected readonly themeService = inject(ThemeService);
   private readonly productService = inject(ProductService);
   private readonly router = inject(Router);
   protected readonly authService = inject(AuthService);
-  @ViewChild('navbarRoot') private navbarRoot?: ElementRef<HTMLElement>;
   @ViewChild('favoritesMenu') private favoritesMenu?: ElementRef<HTMLElement>;
   @ViewChild('accountMenu') private accountMenu?: ElementRef<HTMLElement>;
+  @ViewChild('cartMenu') private cartMenu?: ElementRef<HTMLElement>;
 
   @HostListener('document:click', ['$event'])
   closeFavoritesOnOutsideClick(event: MouseEvent): void {
     const target = event.target;
-    if (
-      this.mobileMenuOpen() &&
-      target instanceof Node &&
-      !this.navbarRoot?.nativeElement.contains(target)
-    ) {
-      this.closeMobileMenu();
-    }
     if (
       this.favoritesOpen() &&
       target instanceof Node &&
@@ -65,23 +51,16 @@ export class NavbarComponent implements OnInit {
     ) {
       this.accountMenuOpen.set(false);
     }
+    if (this.cartMenuOpen() && target instanceof Node && !this.cartMenu?.nativeElement.contains(target)) {
+      this.cartMenuOpen.set(false);
+    }
   }
 
   @HostListener('document:keydown.escape')
   closeFavoritesOnEscape(): void {
     this.favoritesOpen.set(false);
     this.accountMenuOpen.set(false);
-    this.closeMobileMenu();
-  }
-
-  toggleMobileMenu(): void {
-    this.mobileMenuOpen.update((open) => !open);
-    this.favoritesOpen.set(false);
-    this.accountMenuOpen.set(false);
-  }
-
-  closeMobileMenu(): void {
-    this.mobileMenuOpen.set(false);
+    this.cartMenuOpen.set(false);
   }
 
   ngOnInit(): void {
@@ -92,26 +71,7 @@ export class NavbarComponent implements OnInit {
 
   selectCategory(category: string): void {
     this.catalogNavigation.selectedCategory.set(category);
-    this.catalogNavigation.selectedCategories.set([]);
-    this.closeMobileMenu();
     void this.router.navigate(['/products'], { fragment: 'productos' });
-  }
-
-  toggleMobileCategory(category: string): void {
-    const selected = this.catalogNavigation.selectedCategories();
-    this.catalogNavigation.selectedCategory.set('');
-    this.catalogNavigation.selectedCategories.set(
-      selected.includes(category)
-        ? selected.filter((item) => item !== category)
-        : [...selected, category],
-    );
-  }
-
-  updateMobileMaxPrice(event: Event): void {
-    const input = event.target;
-    if (input instanceof HTMLInputElement) {
-      this.catalogNavigation.selectedMaxPrice.set(Number(input.value));
-    }
   }
 
   updateSearch(event: Event): void {
@@ -128,7 +88,22 @@ export class NavbarComponent implements OnInit {
   toggleFavorites(): void {
     this.favoritesOpen.update((open) => !open);
     this.accountMenuOpen.set(false);
+    this.cartMenuOpen.set(false);
     this.cartMessage.set('');
+  }
+
+  toggleCartMenu(): void {
+    this.cartMenuOpen.update((open) => !open);
+    this.favoritesOpen.set(false);
+    this.accountMenuOpen.set(false);
+    if (this.cartMenuOpen()) {
+      this.loadRemoteCartPreview();
+    }
+  }
+
+  openCart(): void {
+    this.cartMenuOpen.set(false);
+    void this.router.navigate(['/cart']);
   }
 
   toggleAccountMenu(): void {
@@ -138,7 +113,6 @@ export class NavbarComponent implements OnInit {
 
   logout(): void {
     this.accountMenuOpen.set(false);
-    this.closeMobileMenu();
     this.favoritesService.clearForLogout();
     this.authService.logout();
     void this.router.navigate(['/login']);
@@ -170,7 +144,6 @@ export class NavbarComponent implements OnInit {
 
   openFavorites(): void {
     this.favoritesOpen.set(false);
-    this.closeMobileMenu();
     void this.router.navigate(['/favorites']);
   }
 
@@ -188,5 +161,28 @@ export class NavbarComponent implements OnInit {
     }
 
     this.cartMessage.set('No se pudo agregar el producto al carrito.');
+  }
+
+  private loadRemoteCartPreview(): void {
+    this.cartPreviewError.set('');
+    if (!this.authService.accessToken()) return;
+
+    this.cartLoading.set(true);
+    this.cartService.getRemoteCart().subscribe({
+      next: (response) => {
+        if (response.Items.length || !this.cartService.items().length) {
+          this.cartService.syncFromApi(response, this.favoritesService.getFavorites());
+        }
+        this.cartLoading.set(false);
+      },
+      error: (error: unknown) => {
+        this.cartPreviewError.set(
+          error instanceof HttpErrorResponse && error.status === 0
+            ? 'No se pudo actualizar el carrito desde el servidor; se muestran los artículos guardados en este navegador.'
+            : 'No se pudo actualizar el carrito; se muestran los artículos guardados en este navegador.',
+        );
+        this.cartLoading.set(false);
+      },
+    });
   }
 }

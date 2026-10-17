@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-labelledby="title">
+  <title id="title">Computadora portátil</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#f2edff"/>
+      <stop offset="1" stop-color="#dfd9f5"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#1d5a88"/>
+      <stop offset=".6" stop-color="#427ac0"/>
+      <stop offset="1" stop-color="#87c5d2"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="480" rx="32" fill="url(#bg)"/>
+  <circle cx="320" cy="225" r="165" fill="#fff" opacity=".42"/>
+  <ellipse cx="320" cy="376" rx="190" ry="17" fill="#7568a7" opacity=".2"/>
+  <rect x="168" y="95" width="304" height="213" rx="15" fill="#45556d" stroke="#27364a" stroke-width="8"/>
+  <rect x="182" y="109" width="276" height="183" rx="7" fill="url(#screen)"/>
+  <circle cx="320" cy="102" r="3" fill="#cbd5e1"/>
+  <path d="M133 310h374l45 42c5 5 1 14-7 14H95c-8 0-12-9-7-14z" fill="#9aa9bd" stroke="#687a91" stroke-width="7"/>
+  <path d="M264 316h112l-8 15h-96z" fill="#6f8096"/>
+  <path d="M200 255c49-52 90-58 131-18 34 33 70 33 113-16v71H196z" fill="#54d4ca" opacity=".82"/>
+</svg>

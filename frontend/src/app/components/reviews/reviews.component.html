@@ -1,0 +1,119 @@
+<main class="reviews-page">
+  <header class="reviews-header">
+    <div>
+      <p class="eyebrow">MI CUENTA</p>
+      <h1>Tus reseñas</h1>
+      <p class="reviews-subtitle">Consulta y actualiza las calificaciones que has compartido.</p>
+    </div>
+    <div class="header-actions">
+      <button type="button" class="secondary-button" (click)="reload()" [disabled]="loading()">
+        Actualizar
+      </button>
+      <a class="back-link" routerLink="/products">← Volver al catálogo</a>
+    </div>
+  </header>
+
+  @if (errorMessage()) {
+    <p class="feedback error" role="alert">{{ errorMessage() }}</p>
+  }
+  @if (saveMessage()) {
+    <p class="feedback success" role="status">{{ saveMessage() }}</p>
+  }
+  @if (loading()) {
+    <section class="empty-state" role="status">
+      <span class="loading-indicator" aria-hidden="true"></span>
+      Buscando tus reseñas en {{ checkedProducts() }} de {{ totalProducts() || '…' }} productos.
+    </section>
+  } @else {
+    @if (failedLookups() > 0) {
+      <p class="feedback warning" role="status">
+        No se pudieron consultar {{ failedLookups() }} productos; el listado podría estar incompleto.
+        Puedes volver a intentarlo con “Actualizar”.
+      </p>
+    }
+    @if (!reviews().length && !errorMessage()) {
+      <section class="empty-state">
+        <h2>Aún no has publicado reseñas</h2>
+        <p>Cuando califiques un producto, podrás consultarlo y editarlo desde aquí.</p>
+        <a class="primary-link" routerLink="/products">Explorar productos</a>
+      </section>
+    } @else {
+      <section class="review-list" aria-label="Reseñas emitidas">
+        @for (entry of reviews(); track entry.review.ResenaId) {
+          <article class="review-card">
+            <div class="product-summary">
+              @if (entry.product.urlImagen) {
+                <img [src]="entry.product.urlImagen" [alt]="entry.product.nombre" loading="lazy" />
+              } @else {
+                <span class="product-placeholder" aria-hidden="true">▧</span>
+              }
+              <div class="product-info">
+                <p class="product-category">{{ entry.product.marca }} · {{ entry.product.categoria }}</p>
+                <h2>{{ entry.product.nombre }}</h2>
+                <strong>{{ entry.product.precio | currency: 'USD' }}</strong>
+              </div>
+              @if (editingReviewId() !== entry.review.ResenaId) {
+                <button
+                  type="button"
+                  class="edit-button"
+                  [attr.aria-label]="'Editar reseña de ' + entry.product.nombre"
+                  (click)="beginEdit(entry)"
+                >
+                  Editar
+                </button>
+              }
+            </div>
+
+            @if (editingReviewId() === entry.review.ResenaId) {
+              <div class="review-editor">
+                <label class="rating-label">Tu calificación</label>
+                <div class="rating-picker" role="group" aria-label="Selecciona de una a cinco estrellas">
+                  @for (star of stars; track star) {
+                    <button
+                      type="button"
+                      [class.selected]="star <= editRating()"
+                      [attr.aria-label]="star + (star === 1 ? ' estrella' : ' estrellas')"
+                      [attr.aria-pressed]="star <= editRating()"
+                      (click)="setRating(star)"
+                    >★</button>
+                  }
+                </div>
+                <label class="comment-label">
+                  <span>Comentario</span>
+                  <textarea
+                    rows="3"
+                    maxlength="1000"
+                    [ngModel]="editComment()"
+                    (ngModelChange)="editComment.set($event)"
+                    aria-label="Comentario de la reseña"
+                  ></textarea>
+                </label>
+                <div class="editor-actions">
+                  <button type="button" class="secondary-button" (click)="cancelEdit()">Cancelar</button>
+                  <button
+                    type="button"
+                    class="primary-button"
+                    [disabled]="savingReviewId() !== null"
+                    (click)="saveReview(entry)"
+                  >
+                    {{ savingReviewId() === entry.review.ResenaId ? 'Guardando…' : 'Guardar cambios' }}
+                  </button>
+                </div>
+              </div>
+            } @else {
+              <div class="review-content">
+                <div class="review-meta">
+                  <span class="stars" [attr.aria-label]="entry.review.Calificacion + ' de 5 estrellas'">
+                    {{ '★'.repeat(entry.review.Calificacion) }}{{ '☆'.repeat(5 - entry.review.Calificacion) }}
+                  </span>
+                  <time>{{ entry.review.Fecha | date: 'mediumDate' }}</time>
+                </div>
+                <p>{{ entry.review.Comentario || 'Sin comentario.' }}</p>
+              </div>
+            }
+          </article>
+        }
+      </section>
+    }
+  }
+</main>

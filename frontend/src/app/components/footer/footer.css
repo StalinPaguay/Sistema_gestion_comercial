@@ -120,20 +120,16 @@
   font-size: 11px;
 }
 
-.footer-bottom-meta {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 20px;
+.footer-bottom > span:last-child {
   color: #94a3b8;
 }
 
-.powered-by {
-  color: #cbd5e1;
+.footer-credit {
+  color: #94a3b8;
   white-space: nowrap;
 }
 
-.powered-by strong {
+.footer-credit strong {
   color: #fff;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -159,12 +155,5 @@
     flex-direction: column;
     gap: 6px;
     padding: 14px 6%;
-  }
-
-  .footer-bottom-meta {
-    width: 100%;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
   }
 }

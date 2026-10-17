@@ -8,209 +8,212 @@
       <p>Únete a la plataforma y gestiona tus compras con facilidad.</p>
     </header>
 
-    @if (registrationSuccess()) {
-      <section class="registration-success" role="status" aria-live="polite">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="m5 12 4 4L19 6" />
-        </svg>
-        <h2>¡Cuenta creada correctamente!</h2>
-        <p>Tu registro se completó. Ya puedes iniciar sesión con tu nueva cuenta.</p>
-        <a class="submit-button success-login-button" routerLink="/login">Iniciar Sesión</a>
-      </section>
-    } @else {
-      <form #registerForm="ngForm" (ngSubmit)="onSubmit(registerForm)">
-        <div class="fields-grid">
-          <label class="input-field">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="8" r="3.2" />
-              <path d="M5.5 19c.4-3 2.8-4.8 6.5-4.8s6.1 1.8 6.5 4.8z" />
-            </svg>
-            <input
-              type="text"
-              name="firstName"
-              placeholder="Nombres"
-              autocomplete="given-name"
-              aria-label="Nombres"
-              required
-              minlength="2"
-              maxlength="100"
-              ngModel
-            />
-          </label>
-
-          <label class="input-field">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="8" r="3.2" />
-              <path d="M5.5 19c.4-3 2.8-4.8 6.5-4.8s6.1 1.8 6.5 4.8z" />
-            </svg>
-            <input
-              type="text"
-              name="lastName"
-              placeholder="Apellidos"
-              autocomplete="family-name"
-              aria-label="Apellidos"
-              required
-              minlength="2"
-              maxlength="100"
-              ngModel
-            />
-          </label>
-
-          <label class="input-field">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M3.5 5.5h17v13h-17z" />
-              <path d="m4 6 8 6 8-6" />
-            </svg>
-            <input
-              type="email"
-              name="email"
-              placeholder="Correo Electrónico"
-              autocomplete="email"
-              aria-label="Correo Electrónico"
-              required
-              email
-              maxlength="150"
-              ngModel
-            />
-          </label>
-
-          <label class="input-field">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M7.2 3.5h3l1.3 4-2 1.5a15 15 0 0 0 5.5 5.5l1.5-2 4 1.3v3c0 1.1-.9 2-2 2A15.5 15.5 0 0 1 5.2 5.5c0-1.1.9-2 2-2Z"
-              />
-            </svg>
-            <input
-              type="tel"
-              name="phone"
-              placeholder="Teléfono (opcional)"
-              autocomplete="tel"
-              aria-label="Teléfono (opcional)"
-              maxlength="20"
-              ngModel
-            />
-          </label>
-
-          <label class="input-field field-wide">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="4" y="5" width="16" height="15" rx="1.5" />
-              <circle cx="12" cy="10" r="2" />
-              <path d="M8 16c.7-1.5 2-2.2 4-2.2s3.3.7 4 2.2M8 3v4m8-4v4" />
-            </svg>
-            <input
-              type="text"
-              name="identification"
-              placeholder="Identificación (opcional)"
-              autocomplete="off"
-              aria-label="Identificación (opcional)"
-              maxlength="20"
-              ngModel
-            />
-          </label>
-
-          <label class="input-field">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="5" y="10" width="14" height="11" rx="1.5" />
-              <path d="M8 10V7a4 4 0 0 1 8 0v3" />
-              <path d="M12 14v3" />
-            </svg>
-            <input
-              [type]="passwordVisible() ? 'text' : 'password'"
-              name="password"
-              placeholder="Contraseña"
-              autocomplete="new-password"
-              aria-label="Contraseña"
-              required
-              minlength="6"
-              ngModel
-            />
-            <button
-              class="visibility-button"
-              type="button"
-              [attr.aria-label]="passwordVisible() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
-              [attr.aria-pressed]="passwordVisible()"
-              (click)="togglePasswordVisibility('password')"
-            >
-              @if (passwordVisible()) {
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-              } @else {
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" />
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="m3 3 18 18" />
-                </svg>
-              }
-            </button>
-          </label>
-
-          <label class="input-field">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="5" y="10" width="14" height="11" rx="1.5" />
-              <path d="M8 10V7a4 4 0 0 1 8 0v3" />
-              <path d="M12 14v3" />
-            </svg>
-            <input
-              [type]="confirmPasswordVisible() ? 'text' : 'password'"
-              name="confirmPassword"
-              placeholder="Confirmar"
-              autocomplete="new-password"
-              aria-label="Confirmar contraseña"
-              required
-              minlength="6"
-              ngModel
-            />
-            <button
-              class="visibility-button"
-              type="button"
-              [attr.aria-label]="
-                confirmPasswordVisible() ? 'Ocultar confirmación' : 'Mostrar confirmación'
-              "
-              [attr.aria-pressed]="confirmPasswordVisible()"
-              (click)="togglePasswordVisibility('confirmation')"
-            >
-              @if (confirmPasswordVisible()) {
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-              } @else {
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" />
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="m3 3 18 18" />
-                </svg>
-              }
-            </button>
-          </label>
-        </div>
-
-        <button
-          class="submit-button"
-          type="submit"
-          [disabled]="
-            registerForm.invalid ||
-            registerForm.value.password !== registerForm.value.confirmPassword ||
-            isSubmitting()
-          "
-        >
+    @if (registrationComplete()) {
+      <section class="success-panel" role="status" aria-live="polite">
+        <span class="success-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="m5 12 4.5 4.5L19 7" />
+          </svg>
+        </span>
+        <h2>¡Cuenta creada con éxito!</h2>
+        <p>Tu registro se completó correctamente. Ya puedes comenzar a explorar TECNOMEGA.</p>
+        <button class="submit-button" type="button" (click)="continueToStore()">
+          Ir a la tienda
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M5 12h13" />
             <path d="m13 6 6 6-6 6" />
           </svg>
-          Registrarse
         </button>
+      </section>
+    } @else {
+    <form #registerForm="ngForm" (ngSubmit)="onSubmit(registerForm)">
+      <div class="fields-grid">
+        <label class="input-field">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="8" r="3.2" />
+            <path d="M5.5 19c.4-3 2.8-4.8 6.5-4.8s6.1 1.8 6.5 4.8z" />
+          </svg>
+          <input
+            type="text"
+            name="firstName"
+            placeholder="Nombres"
+            autocomplete="given-name"
+            aria-label="Nombres"
+            required
+            minlength="2"
+            maxlength="100"
+            ngModel
+          />
+        </label>
 
-        @if (feedback()) {
-          <p class="form-feedback" role="alert">{{ feedback() }}</p>
-        }
+        <label class="input-field">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="8" r="3.2" />
+            <path d="M5.5 19c.4-3 2.8-4.8 6.5-4.8s6.1 1.8 6.5 4.8z" />
+          </svg>
+          <input
+            type="text"
+            name="lastName"
+            placeholder="Apellidos"
+            autocomplete="family-name"
+            aria-label="Apellidos"
+            required
+            minlength="2"
+            maxlength="100"
+            ngModel
+          />
+        </label>
 
-        <p class="login-prompt">¿Ya tienes una cuenta? <a routerLink="/login">Inicia Sesión</a></p>
-      </form>
+        <label class="input-field">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3.5 5.5h17v13h-17z" />
+            <path d="m4 6 8 6 8-6" />
+          </svg>
+          <input
+            type="email"
+            name="email"
+            placeholder="Correo Electrónico"
+            autocomplete="email"
+            aria-label="Correo Electrónico"
+            required
+            email
+            maxlength="150"
+            ngModel
+          />
+        </label>
+
+        <label class="input-field">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7.2 3.5h3l1.3 4-2 1.5a15 15 0 0 0 5.5 5.5l1.5-2 4 1.3v3c0 1.1-.9 2-2 2A15.5 15.5 0 0 1 5.2 5.5c0-1.1.9-2 2-2Z" />
+          </svg>
+          <input
+            type="tel"
+            name="phone"
+            placeholder="Teléfono (opcional)"
+            autocomplete="tel"
+            aria-label="Teléfono (opcional)"
+            maxlength="20"
+            ngModel
+          />
+        </label>
+
+        <label class="input-field field-wide">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="5" width="16" height="15" rx="1.5" />
+            <circle cx="12" cy="10" r="2" />
+            <path d="M8 16c.7-1.5 2-2.2 4-2.2s3.3.7 4 2.2M8 3v4m8-4v4" />
+          </svg>
+          <input
+            type="text"
+            name="identification"
+            placeholder="Identificación (opcional)"
+            autocomplete="off"
+            aria-label="Identificación (opcional)"
+            maxlength="20"
+            ngModel
+          />
+        </label>
+
+        <label class="input-field">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="5" y="10" width="14" height="11" rx="1.5" />
+            <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+            <path d="M12 14v3" />
+          </svg>
+          <input
+            [type]="passwordVisible() ? 'text' : 'password'"
+            name="password"
+            placeholder="Contraseña"
+            autocomplete="new-password"
+            aria-label="Contraseña"
+            required
+            minlength="6"
+            ngModel
+          />
+          <button
+            class="visibility-button"
+            type="button"
+            [attr.aria-label]="passwordVisible() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+            [attr.aria-pressed]="passwordVisible()"
+            (click)="togglePasswordVisibility('password')"
+          >
+            @if (passwordVisible()) {
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            } @else {
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" />
+                <circle cx="12" cy="12" r="3" />
+                <path d="m3 3 18 18" />
+              </svg>
+            }
+          </button>
+        </label>
+
+        <label class="input-field">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="5" y="10" width="14" height="11" rx="1.5" />
+            <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+            <path d="M12 14v3" />
+          </svg>
+          <input
+            [type]="confirmPasswordVisible() ? 'text' : 'password'"
+            name="confirmPassword"
+            placeholder="Confirmar"
+            autocomplete="new-password"
+            aria-label="Confirmar contraseña"
+            required
+            minlength="6"
+            ngModel
+          />
+          <button
+            class="visibility-button"
+            type="button"
+            [attr.aria-label]="confirmPasswordVisible() ? 'Ocultar confirmación' : 'Mostrar confirmación'"
+            [attr.aria-pressed]="confirmPasswordVisible()"
+            (click)="togglePasswordVisibility('confirmation')"
+          >
+            @if (confirmPasswordVisible()) {
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            } @else {
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" />
+                <circle cx="12" cy="12" r="3" />
+                <path d="m3 3 18 18" />
+              </svg>
+            }
+          </button>
+        </label>
+      </div>
+
+      <button
+        class="submit-button"
+        type="submit"
+        [disabled]="registerForm.invalid || registerForm.value.password !== registerForm.value.confirmPassword || isSubmitting()"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 12h13" />
+          <path d="m13 6 6 6-6 6" />
+        </svg>
+        Registrarse
+      </button>
+
+      @if (feedback()) {
+        <p class="form-feedback" role="alert">{{ feedback() }}</p>
+      }
+
+      <p class="login-prompt">
+        ¿Ya tienes una cuenta? <a routerLink="/login">Inicia Sesión</a>
+      </p>
+    </form>
     }
 
+    @if (!registrationComplete()) {
     <footer class="trust-badges" aria-label="Seguridad de la tienda">
       <span>
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -227,5 +230,6 @@
         Datos Protegidos
       </span>
     </footer>
+    }
   </section>
 </main>

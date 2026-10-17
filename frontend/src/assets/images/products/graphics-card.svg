@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-labelledby="title">
+  <title id="title">Tarjeta gráfica</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#fff2e6"/>
+      <stop offset="1" stop-color="#f8dfc9"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#475569"/>
+      <stop offset="1" stop-color="#1e293b"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="480" rx="32" fill="url(#bg)"/>
+  <circle cx="320" cy="223" r="160" fill="#fff" opacity=".42"/>
+  <ellipse cx="320" cy="377" rx="178" ry="18" fill="#b58156" opacity=".2"/>
+  <rect x="127" y="147" width="388" height="184" rx="23" fill="url(#card)" stroke="#17243a" stroke-width="8"/>
+  <path d="M146 331v23h25v-23m276 0v23h25v-23" fill="#d5a35f" stroke="#8c653b" stroke-width="5"/>
+  <circle cx="254" cy="239" r="61" fill="#243449" stroke="#72839a" stroke-width="7"/>
+  <circle cx="254" cy="239" r="18" fill="#72b7dc"/>
+  <path d="M254 183c23 18 31 31 12 47m44 9c-19 21-33 27-47 8m-9 48c-18-21-23-36-3-48m-45-10c20-19 35-25 48-6m-6-48c21 18 27 32 8 47" fill="none" stroke="#89a4c4" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="392" cy="239" r="61" fill="#243449" stroke="#72839a" stroke-width="7"/>
+  <circle cx="392" cy="239" r="18" fill="#72b7dc"/>
+  <path d="M392 183c23 18 31 31 12 47m44 9c-19 21-33 27-47 8m-9 48c-18-21-23-36-3-48m-45-10c20-19 35-25 48-6m-6-48c21 18 27 32 8 47" fill="none" stroke="#89a4c4" stroke-width="9" stroke-linecap="round"/>
+</svg>

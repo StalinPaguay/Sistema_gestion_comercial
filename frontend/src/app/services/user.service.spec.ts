@@ -52,6 +52,7 @@ describe('UserService password update', () => {
 
   it('patches only fields accepted by the customer update endpoint', () => {
       const profile = {
+        Identificacion: '1234567890',
         Nombres: 'Ana',
         Apellidos: 'Pérez',
         Email: 'ana@example.com',
@@ -63,7 +64,6 @@ describe('UserService password update', () => {
       const request = httpTesting.expectOne(`${API_BASE_URL}/clientes/42`);
       expect(request.request.method).toBe('PATCH');
       expect(request.request.body).toEqual(profile);
-      expect(request.request.body).not.toHaveProperty('Identificacion');
     expect(request.request.headers.get('Authorization')).toBe('Bearer test-access-token');
     request.flush(profile);
   });

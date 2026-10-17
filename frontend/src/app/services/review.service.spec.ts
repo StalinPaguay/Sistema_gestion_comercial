@@ -6,7 +6,7 @@ import {
 import { TestBed } from '@angular/core/testing';
 import { AuthService } from './auth.service';
 import { API_BASE_URL } from './api.config';
-import { ReviewService } from './review.service';
+import { ProductReviews, ReviewService } from './review.service';
 
 describe('ReviewService catalog summaries', () => {
   let service: ReviewService;
@@ -75,6 +75,51 @@ describe('ReviewService catalog summaries', () => {
     expect(results.find((result) => result.productId === 11)?.failed).toBe(false);
   });
 
+  it('shares an in-flight request and reuses the response during the cache window', () => {
+    const results: ProductReviews[] = [];
+
+    service.getProductReviews(23).subscribe((reviews) => results.push(reviews));
+    service.getProductReviews(23).subscribe((reviews) => results.push(reviews));
+
+    const request = httpTesting.expectOne(`${API_BASE_URL}/productos/23/resenas`);
+    request.flush(reviewResponse(23));
+
+    service.getProductReviews(23).subscribe((reviews) => results.push(reviews));
+    httpTesting.expectNone(`${API_BASE_URL}/productos/23/resenas`);
+    expect(results).toHaveLength(3);
+    expect(results.every((reviews) => reviews.ProductoId === 23)).toBe(true);
+  });
+
+  it('retries failed review requests instead of caching the error', () => {
+    let errorCount = 0;
+    service.getProductReviews(23).subscribe({ error: () => errorCount++ });
+    httpTesting
+      .expectOne(`${API_BASE_URL}/productos/23/resenas`)
+      .flush({ detail: 'Unavailable' }, { status: 503, statusText: 'Unavailable' });
+
+    service.getProductReviews(23).subscribe();
+    httpTesting.expectOne(`${API_BASE_URL}/productos/23/resenas`).flush(reviewResponse(23));
+
+    expect(errorCount).toBe(1);
+  });
+
+  it('invalidates cached product reviews after submitting a review', () => {
+    service.getProductReviews(23).subscribe();
+    httpTesting.expectOne(`${API_BASE_URL}/productos/23/resenas`).flush(reviewResponse(23));
+
+    service.submitReview(23, { Calificacion: 5, Comentario: 'Nueva reseña' }).subscribe();
+    httpTesting.expectOne(`${API_BASE_URL}/productos/23/resenas`).flush({
+      ResenaId: 7,
+      ProductoId: 23,
+      Calificacion: 5,
+      Comentario: 'Nueva reseña',
+      Fecha: '2026-10-17T12:00:00',
+    });
+
+    service.getProductReviews(23).subscribe();
+    httpTesting.expectOne(`${API_BASE_URL}/productos/23/resenas`).flush(reviewResponse(23));
+  });
+
   it('submits a review to the backend create endpoint with the authenticated token', () => {
     const review = { Calificacion: 5, Comentario: 'Excelente producto' };
     let result: unknown;
@@ -101,6 +146,74 @@ describe('ReviewService catalog summaries', () => {
       Calificacion: 5,
       Comentario: 'Excelente producto',
       Fecha: '2025-03-01T12:00:00',
+    });
+  });
+
+  it('loads the current user review for a product', () => {
+    let result: unknown;
+
+    service.getMyProductReview(23).subscribe((review) => {
+      result = review;
+    });
+
+    const request = httpTesting.expectOne(`${API_BASE_URL}/productos/23/resenas/me`);
+    expect(request.request.method).toBe('GET');
+    request.flush({
+      ResenaId: 7,
+      ProductoId: 23,
+      Calificacion: 4,
+      Comentario: 'Muy bueno',
+      Fecha: '2026-10-17T12:00:00',
+    });
+
+    expect(result).toEqual({
+      ResenaId: 7,
+      ProductoId: 23,
+      Calificacion: 4,
+      Comentario: 'Muy bueno',
+      Fecha: '2026-10-17T12:00:00',
+    });
+  });
+
+  it('returns null when the current user has not reviewed a product', () => {
+    let result: unknown = 'not-set';
+
+    service.getMyProductReview(23).subscribe((review) => {
+      result = review;
+    });
+
+    httpTesting
+      .expectOne(`${API_BASE_URL}/productos/23/resenas/me`)
+      .flush({ resena: null });
+
+    expect(result).toBeNull();
+  });
+
+  it('updates a review by its review ID', () => {
+    const review = { Calificacion: 2, Comentario: 'Actualizada' };
+    let result: unknown;
+
+    service.updateReview(7, review).subscribe((response) => {
+      result = response;
+    });
+
+    const request = httpTesting.expectOne(`${API_BASE_URL}/resenas/7`);
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toEqual(review);
+    request.flush({
+      ResenaId: 7,
+      ProductoId: 23,
+      Calificacion: 2,
+      Comentario: 'Actualizada',
+      Fecha: '2026-10-17T12:00:00',
+    });
+
+    expect(result).toEqual({
+      ResenaId: 7,
+      ProductoId: 23,
+      Calificacion: 2,
+      Comentario: 'Actualizada',
+      Fecha: '2026-10-17T12:00:00',
     });
   });
 

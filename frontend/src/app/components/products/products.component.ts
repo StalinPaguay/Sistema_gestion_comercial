@@ -1,18 +1,29 @@
 import { CurrencyPipe, DatePipe, DecimalPipe, NgFor, NgIf } from '@angular/common';
-import { ChangeDetectorRef, Component, effect, inject, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, effect, HostListener, inject, OnDestroy, OnInit } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { forkJoin, Subscription } from 'rxjs';
+import { forkJoin } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { CartService } from '../../services/cart.service';
 import { FavoritesService } from '../../services/favorites.service';
-import { Product, ProductCategory, ProductService } from '../../services/product.service';
-import { ProductReview, ProductReviews, ReviewService } from '../../services/review.service';
+import {
+  Product,
+  ProductCategory,
+  ProductService,
+  useProductImageFallback,
+} from '../../services/product.service';
+import {
+  ProductReview,
+  ProductReviewSummary,
+  ProductReviews,
+  ReviewService,
+} from '../../services/review.service';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { CatalogNavigationService } from '../../services/catalog-navigation.service';
 import { AddToCartModalComponent } from '../add-to-cart-modal/add-to-cart-modal.component';
+import { Promotion, PromotionService } from '../../services/promotion.service';
 
 @Component({
   selector: 'app-products',
@@ -39,9 +50,13 @@ export class ProductsComponent implements OnInit, OnDestroy {
   protected readonly favoritesService = inject(FavoritesService);
   private readonly authService = inject(AuthService);
   private readonly reviewService = inject(ReviewService);
+  private readonly promotionService = inject(PromotionService);
   private readonly router = inject(Router);
-  private readonly changeDetector = inject(ChangeDetectorRef);
   readonly ratingStars = [1, 2, 3, 4, 5];
+
+  onProductImageError(event: Event): void {
+    useProductImageFallback(event);
+  }
 
   readonly banners: string[] = [
     'images/publicidad/Publicidad 1.jpg',
@@ -50,7 +65,14 @@ export class ProductsComponent implements OnInit, OnDestroy {
     'images/publicidad/Publicidad 4.jpg',
   ];
   products: Product[] = [];
+  promotions: Promotion[] = [];
+  promotionsLoading = true;
+  promotionsError = '';
   categories: ProductCategory[] = [];
+  selectedCategories: string[] = [];
+  filtersOpen = false;
+  selectedMaxPrice = 0;
+  selectedMinimumRating = 0;
   cartNotice = '';
   cartNoticeError = false;
   loading = true;
@@ -62,10 +84,7 @@ export class ProductsComponent implements OnInit, OnDestroy {
   cartAddError = '';
   cartAdding = false;
   ratingSummaries: Record<number, ProductReviews | null | undefined> = {};
-  ratingLoadWarning = '';
-  ratingLoading = false;
   selectedReviews: ProductReview[] = [];
-  reviewsExpanded = false;
   selectedRating = 0;
   hoverRating = 0;
   reviewComment = '';
@@ -76,8 +95,6 @@ export class ProductsComponent implements OnInit, OnDestroy {
   currentIndex = 0;
   private autoSlideInterval: ReturnType<typeof setInterval> | undefined;
   private noticeTimeout: ReturnType<typeof setTimeout> | undefined;
-  private detailSubscription?: Subscription;
-  private selectedReviewsSubscription?: Subscription;
 
   constructor(private readonly cdr: ChangeDetectorRef) {
     effect(() => {
@@ -96,43 +113,18 @@ export class ProductsComponent implements OnInit, OnDestroy {
     this.catalogNavigation.selectedCategory.set(category);
   }
 
-  get selectedCategories(): string[] {
-    return this.catalogNavigation.selectedCategories();
-  }
-
-  set selectedCategories(categories: string[]) {
-    this.catalogNavigation.selectedCategories.set(categories);
-  }
-
-  get selectedMaxPrice(): number {
-    return this.catalogNavigation.selectedMaxPrice();
-  }
-
-  set selectedMaxPrice(price: number) {
-    this.catalogNavigation.selectedMaxPrice.set(price);
-  }
-
-  get selectedMinimumRating(): number {
-    return this.catalogNavigation.selectedMinimumRating();
-  }
-
-  set selectedMinimumRating(rating: number) {
-    this.catalogNavigation.selectedMinimumRating.set(rating);
-  }
-
   get searchTerm(): string {
     return this.catalogNavigation.searchTerm();
   }
 
   ngOnInit(): void {
     this.loadCatalog();
+    this.loadPromotions();
     this.startAutoSlide();
   }
 
   ngOnDestroy(): void {
     this.stopAutoSlide();
-    this.detailSubscription?.unsubscribe();
-    this.selectedReviewsSubscription?.unsubscribe();
     if (this.noticeTimeout) {
       clearTimeout(this.noticeTimeout);
     }
@@ -162,10 +154,6 @@ export class ProductsComponent implements OnInit, OnDestroy {
 
   get minimumRatingOptions(): number[] {
     return [4, 3, 2, 1];
-  }
-
-  get visibleReviews(): ProductReview[] {
-    return this.reviewsExpanded ? this.selectedReviews : this.selectedReviews.slice(0, 5);
   }
 
   get hasActiveFilters(): boolean {
@@ -204,6 +192,52 @@ export class ProductsComponent implements OnInit, OnDestroy {
     return (this.currentIndex + 1) % this.banners.length;
   }
 
+  private loadPromotions(): void {
+    this.promotionsLoading = true;
+    this.promotionsError = '';
+    this.promotionService.getActivePromotions().subscribe({
+      next: (promotions) => {
+        this.promotions = promotions.filter((promotion) => promotion.Estado);
+        this.promotionsLoading = false;
+        this.cdr.detectChanges();
+      },
+      error: (error: unknown) => {
+        this.promotions = [];
+        this.promotionsError =
+          error instanceof HttpErrorResponse && error.status === 0
+            ? 'No se pudieron cargar las promociones. Verifica la conexión e inténtalo de nuevo.'
+            : 'No se pudieron cargar las promociones activas.';
+        this.promotionsLoading = false;
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  formatPromotionValue(promotion: Promotion): string {
+    const value = Number(promotion.ValorDescuento);
+    if (!Number.isFinite(value)) {
+      return '';
+    }
+    return promotion.TipoDescuento === 'PORCENTAJE'
+      ? `${value}% de descuento`
+      : `${value.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} de descuento`;
+  }
+
+  promotionScope(promotion: Promotion): string {
+    const productCount = promotion.ProductosIds?.length ?? 0;
+    const categoryCount = promotion.CategoriasIds?.length ?? 0;
+    if (productCount && categoryCount) {
+      return `Válido para ${productCount} producto(s) y ${categoryCount} categoría(s)`;
+    }
+    if (productCount) {
+      return `Válido para ${productCount} producto(s)`;
+    }
+    if (categoryCount) {
+      return `Válido para ${categoryCount} categoría(s)`;
+    }
+    return 'Consulta las condiciones al aplicar el cupón en tu compra';
+  }
+
   loadCatalog(): void {
     this.loading = true;
     this.loadWarning = '';
@@ -216,9 +250,9 @@ export class ProductsComponent implements OnInit, OnDestroy {
         this.catalogNavigation.setCategories(categories.data);
         this.products = products.data.map((product) => ({
           ...product,
-          categoria: product.categoria,
+          categoria:
+            product.categoria,
         }));
-        this.catalogNavigation.maximumAvailablePrice.set(this.maximumAvailablePrice);
         this.selectedMaxPrice =
           this.selectedMaxPrice > 0
             ? Math.min(this.selectedMaxPrice, this.maximumAvailablePrice)
@@ -234,7 +268,6 @@ export class ProductsComponent implements OnInit, OnDestroy {
         this.products = [];
         this.categories = [];
         this.ratingSummaries = {};
-        this.ratingLoadWarning = '';
         this.catalogNavigation.setCategories([]);
         this.loadWarning =
           error instanceof HttpErrorResponse && error.status === 0
@@ -287,6 +320,15 @@ export class ProductsComponent implements OnInit, OnDestroy {
     this.catalogNavigation.searchTerm.set('');
   }
 
+  closeFilters(): void {
+    this.filtersOpen = false;
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    this.closeFilters();
+  }
+
   toggleFavorite(product: Product): void {
     this.favoritesService.toggleFavorite(product);
   }
@@ -314,12 +356,7 @@ export class ProductsComponent implements OnInit, OnDestroy {
 
   confirmAddToCart(quantity: number): void {
     const product = this.cartProductToAdd;
-    if (
-      !product ||
-      this.cartAdding ||
-      quantity < 1 ||
-      quantity > this.cartProductAvailableQuantity
-    ) {
+    if (!product || this.cartAdding || quantity < 1 || quantity > this.cartProductAvailableQuantity) {
       return;
     }
 
@@ -393,33 +430,25 @@ export class ProductsComponent implements OnInit, OnDestroy {
   }
 
   showDetails(product: Product): void {
-    this.detailSubscription?.unsubscribe();
-    this.selectedReviewsSubscription?.unsubscribe();
     this.selectedProduct = product;
     this.detailWarning = '';
     this.detailLoading = true;
-    this.selectedReviews = [];
-    this.reviewsExpanded = false;
+    const cachedReviews = this.ratingSummaries[product.productoId];
+    this.selectedReviews = cachedReviews?.Resenas ?? [];
     this.selectedRating = 0;
     this.hoverRating = 0;
     this.reviewComment = '';
     this.reviewMessage = '';
     this.reviewError = '';
-    this.reviewLoading = true;
-    this.detailSubscription = this.productService.getProductById(product.productoId).subscribe({
+    this.reviewLoading = !cachedReviews;
+    this.productService.getProductById(product.productoId).subscribe({
       next: (result) => {
-        if (this.selectedProduct?.productoId !== product.productoId) {
-          return;
-        }
         this.selectedProduct = result.data;
         this.detailWarning = '';
         this.detailLoading = false;
         this.cdr.detectChanges();
       },
       error: (error: unknown) => {
-        if (this.selectedProduct?.productoId !== product.productoId) {
-          return;
-        }
         this.detailWarning =
           error instanceof HttpErrorResponse && error.status === 404
             ? 'Este producto ya no está disponible.'
@@ -432,12 +461,7 @@ export class ProductsComponent implements OnInit, OnDestroy {
   }
 
   closeDetails(): void {
-    this.detailSubscription?.unsubscribe();
-    this.selectedReviewsSubscription?.unsubscribe();
     this.selectedProduct = null;
-    this.detailLoading = false;
-    this.reviewLoading = false;
-    this.reviewsExpanded = false;
     this.detailWarning = '';
     this.reviewError = '';
     this.reviewMessage = '';
@@ -500,60 +524,31 @@ export class ProductsComponent implements OnInit, OnDestroy {
   }
 
   private loadRatingSummaries(products: Product[]): void {
-    this.ratingLoadWarning = '';
-    this.ratingLoading = products.length > 0;
     for (const product of products) {
       this.ratingSummaries[product.productoId] = undefined;
     }
     if (!products.length) {
-      this.ratingLoading = false;
       return;
     }
 
     this.reviewService
       .getProductReviewSummaries(products.map((product) => product.productoId))
-      .subscribe({
-        next: (result) => {
-          this.ratingSummaries[result.productId] = result.reviews;
-          if (result.failed) {
-            const failedCount = Object.values(this.ratingSummaries).filter(
-              (summary) => summary === null,
-            ).length;
-            this.ratingLoadWarning =
-              failedCount === products.length
-                ? 'No se pudieron cargar las calificaciones. Inténtalo de nuevo.'
-                : `No se pudieron cargar las calificaciones de ${failedCount} producto(s).`;
-          }
-          this.cdr.detectChanges();
-        },
-        complete: () => {
-          this.ratingLoading = false;
-          this.cdr.detectChanges();
-        },
+      .subscribe((summary: ProductReviewSummary) => {
+        this.ratingSummaries[summary.productId] = summary.failed ? null : summary.reviews;
+        this.cdr.detectChanges();
       });
   }
 
-  retryRatingSummaries(): void {
-    this.loadRatingSummaries(this.products);
-  }
-
   private loadSelectedReviews(productId: number): void {
-    this.selectedReviewsSubscription?.unsubscribe();
     this.reviewLoading = true;
-    this.selectedReviewsSubscription = this.reviewService.getProductReviews(productId).subscribe({
+    this.reviewService.getProductReviews(productId).subscribe({
       next: (reviews) => {
-        if (this.selectedProduct?.productoId !== productId) {
-          return;
-        }
         this.ratingSummaries[productId] = reviews;
         this.selectedReviews = reviews.Resenas;
         this.reviewLoading = false;
         this.cdr.detectChanges();
       },
       error: (error: unknown) => {
-        if (this.selectedProduct?.productoId !== productId) {
-          return;
-        }
         this.ratingSummaries[productId] = null;
         this.reviewError = this.reviewErrorMessage(error);
         this.reviewLoading = false;
@@ -577,7 +572,7 @@ export class ProductsComponent implements OnInit, OnDestroy {
 
   startAutoSlide(): void {
     this.stopAutoSlide();
-    this.autoSlideInterval = setInterval(() => this.nextSlide(), 3500);
+    this.autoSlideInterval = setInterval(() => this.nextSlide(), 5000);
   }
 
   stopAutoSlide(): void {

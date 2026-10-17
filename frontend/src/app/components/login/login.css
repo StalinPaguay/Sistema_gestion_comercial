@@ -68,7 +68,7 @@ form {
 }
 
 .input-field + .input-field {
-  margin-top: 18px;
+  margin-top: 16px;
 }
 
 .input-field > svg,

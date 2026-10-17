@@ -20,6 +20,7 @@ export interface UserProfile {
 }
 
 export interface ProfileUpdate {
+  Identificacion: string;
   Nombres: string;
   Apellidos: string;
   Email: string;
@@ -32,24 +33,9 @@ export interface PasswordUpdate {
 }
 
 export interface PasswordUpdateResponse {
-  mensaje: string;
-  message: string;
+  mensaje?: string;
+  message?: string;
 }
-
-interface PasswordUpdateEndpoint {
-  method: 'PATCH' | 'POST';
-  path: string;
-}
-
-const PASSWORD_UPDATE_ENDPOINTS: readonly PasswordUpdateEndpoint[] = [
-  { method: 'PATCH', path: '/auth/cambiar-password' },
-  { method: 'POST', path: '/auth/cambiar-password' },
-  { method: 'PATCH', path: '/auth/password' },
-  { method: 'PATCH', path: '/api/auth/cambiar-password' },
-  { method: 'POST', path: '/api/auth/cambiar-password' },
-  { method: 'PATCH', path: '/usuarios/cambiar-password' },
-  { method: 'POST', path: '/usuarios/cambiar-password' },
-];
 
 export interface DeliveryAddress {
   DireccionId: number;
@@ -90,7 +76,15 @@ export class UserService {
   }
 
   updatePassword(passwords: PasswordUpdate): Observable<PasswordUpdateResponse> {
-    return this.tryPasswordUpdate(passwords, this.authHeaders(), 0);
+    const url = `${API_BASE_URL}/auth/cambiar-password`;
+    const headers = this.authHeaders();
+    return this.http.patch<PasswordUpdateResponse>(url, passwords, { headers }).pipe(
+      catchError((error: unknown) =>
+        error instanceof HttpErrorResponse && error.status === 404
+          ? this.http.post<PasswordUpdateResponse>(url, passwords, { headers })
+          : throwError(() => error),
+      ),
+    );
   }
 
   getAddresses(): Observable<DeliveryAddress[]> {
@@ -100,9 +94,11 @@ export class UserService {
   }
 
   createAddress(address: DeliveryAddressInput): Observable<DeliveryAddress> {
-    return this.http.post<DeliveryAddress>(`${API_BASE_URL}/clientes/me/direcciones`, address, {
-      headers: this.authHeaders(),
-    });
+    return this.http.post<DeliveryAddress>(
+      `${API_BASE_URL}/clientes/me/direcciones`,
+      address,
+      { headers: this.authHeaders() },
+    );
   }
 
   updateAddress(
@@ -121,45 +117,6 @@ export class UserService {
       `${API_BASE_URL}/clientes/direcciones/${addressId}`,
       { headers: this.authHeaders() },
     );
-  }
-
-  private tryPasswordUpdate(
-    passwords: PasswordUpdate,
-    headers: HttpHeaders,
-    endpointIndex: number,
-  ): Observable<PasswordUpdateResponse> {
-    const endpoint = PASSWORD_UPDATE_ENDPOINTS[endpointIndex];
-    const url = `${API_BASE_URL}${endpoint.path}`;
-
-    return this.http
-      .request<PasswordUpdateResponse>(endpoint.method, url, {
-        body: passwords,
-        headers,
-      })
-      .pipe(
-        catchError((error: unknown) => {
-          if (!(error instanceof HttpErrorResponse) || error.status !== 404) {
-            return throwError(() => error);
-          }
-
-          if (endpointIndex + 1 < PASSWORD_UPDATE_ENDPOINTS.length) {
-            return this.tryPasswordUpdate(passwords, headers, endpointIndex + 1);
-          }
-
-          return throwError(
-            () =>
-              new HttpErrorResponse({
-                error: {
-                  detail:
-                    'El servidor no publica ninguna de las rutas conocidas para actualizar la contraseña.',
-                },
-                status: error.status,
-                statusText: error.statusText,
-                url: error.url ?? url,
-              }),
-          );
-        }),
-      );
   }
 
   private authHeaders(): HttpHeaders {

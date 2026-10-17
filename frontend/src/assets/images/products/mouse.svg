@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-labelledby="title">
+  <title id="title">Mouse inalámbrico</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#edf0ff"/>
+      <stop offset="1" stop-color="#dadfff"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#344563"/>
+      <stop offset="1" stop-color="#17243a"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="480" rx="32" fill="url(#bg)"/>
+  <circle cx="320" cy="226" r="157" fill="#fff" opacity=".4"/>
+  <ellipse cx="320" cy="380" rx="104" ry="19" fill="#6675b4" opacity=".2"/>
+  <path d="M320 91c-77 0-126 56-126 139v67c0 65 49 112 126 112s126-47 126-112v-67c0-83-49-139-126-139z" fill="url(#body)" stroke="#0f1b2c" stroke-width="8"/>
+  <path d="M320 95v115m-125 20h250" fill="none" stroke="#8da2c0" stroke-width="7"/>
+  <rect x="305" y="126" width="30" height="58" rx="14" fill="#71a8ff"/>
+  <path d="M229 286c26 27 56 40 91 40s65-13 91-40" fill="none" stroke="#314763" stroke-width="7" opacity=".8"/>
+  <circle cx="320" cy="349" r="8" fill="#71a8ff"/>
+</svg>

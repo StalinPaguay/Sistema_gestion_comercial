@@ -55,7 +55,7 @@
 
 .eyebrow {
   margin: 0 0 7px;
-  color: #0759c7;
+  color: var(--text-accent, #0759c7);
   font-size: 0.74rem;
   font-weight: 800;
   letter-spacing: 0.1em;
@@ -103,7 +103,7 @@ h1 {
 }
 
 .profile-card {
-  padding: 32px;
+  padding: 24px;
 }
 
 .password-card {
@@ -156,28 +156,22 @@ h1 {
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 40px 28px;
+  gap: 16px;
 }
 
 .form-grid label {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 12px;
+  gap: 7px;
   color: var(--text-primary, #1e293b);
   font-size: 0.84rem;
   font-weight: 700;
 }
 
-.required-indicator {
-  color: #b91c1c;
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
 .form-grid input:not([type='checkbox']) {
   width: 100%;
-  min-height: 42px;
+  min-height: 44px;
   padding: 0 12px;
   border: 1px solid var(--app-border, #cbd5e1);
   border-radius: 8px;
@@ -188,57 +182,7 @@ h1 {
   font-weight: 400;
 }
 
-.password-input {
-  position: relative;
-  width: 100%;
-}
-
-.password-input input:not([type='checkbox']) {
-  padding-right: 44px;
-}
-
-.password-visibility-button {
-  position: absolute;
-  top: 50%;
-  right: 10px;
-  display: grid;
-  width: 26px;
-  height: 26px;
-  place-items: center;
-  padding: 3px;
-  transform: translateY(-50%);
-  border: 0;
-  border-radius: 5px;
-  color: var(--text-secondary, #64748b);
-  background: transparent;
-  cursor: pointer;
-}
-
-.password-visibility-button:hover {
-  color: var(--text-accent, #0759c7);
-}
-
-.password-visibility-button:focus-visible {
-  outline: 2px solid #3981d9;
-  outline-offset: 2px;
-}
-
-.password-visibility-button svg {
-  width: 19px;
-  height: 19px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
-}
-
 .form-grid input:focus {
-  border-color: #3981d9;
-  box-shadow: 0 0 0 3px rgb(57 129 217 / 12%);
-}
-
-.password-input:focus-within input:not([type='checkbox']) {
   border-color: #3981d9;
   box-shadow: 0 0 0 3px rgb(57 129 217 / 12%);
 }
@@ -246,19 +190,6 @@ h1 {
 .form-grid input:disabled {
   opacity: 0.72;
   cursor: not-allowed;
-}
-
-.form-grid input[readonly] {
-  color: var(--text-secondary, #64748b);
-  background: var(--app-surface-muted, #f1f5f9);
-  cursor: default;
-}
-
-.form-note {
-  margin: 12px 0 0;
-  color: var(--text-secondary, #64748b);
-  font-size: 0.8rem;
-  line-height: 1.5;
 }
 
 .field-wide {
@@ -293,7 +224,7 @@ h1 {
 }
 
 .profile-card form > .primary-button {
-  margin-top: 24px;
+  margin-top: 20px;
 }
 
 .secondary-button {
@@ -415,11 +346,7 @@ h1 {
 
 .address-form-card {
   margin-top: 20px;
-  padding: 32px;
-}
-
-.address-form-card .form-grid {
-  row-gap: 40px;
+  padding: 22px;
 }
 
 .address-form-card .section-heading {
@@ -503,6 +430,10 @@ h1 {
   background: #450a0a;
 }
 
+:host-context(html[data-theme='dark']) .password-feedback.error {
+  color: #fca5a5;
+}
+
 :host-context(html[data-theme='dark']) .feedback.success {
   border-color: #14532d;
   color: #bbf7d0;
@@ -542,22 +473,14 @@ h1 {
   }
 }
 
-@media (max-width: 768px) {
-  .profile-card,
-  .address-form-card {
-    padding: 24px;
-  }
-}
-
 @media (max-width: 520px) {
   .profile-card,
   .address-form-card {
-    padding: 22px;
+    padding: 18px;
   }
 
   .form-grid {
     grid-template-columns: 1fr;
-    row-gap: 34px;
   }
 
   .field-wide {
@@ -571,5 +494,4 @@ h1 {
   .form-actions button {
     width: 100%;
   }
-
 }

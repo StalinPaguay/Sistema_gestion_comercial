@@ -17,7 +17,7 @@
 
     <div class="cart-modal-product">
       <div class="cart-modal-image">
-        <img [src]="product.urlImagen" [alt]="product.nombre" />
+        <img [src]="product.urlImagen" [alt]="product.nombre" (error)="onProductImageError($event)" />
       </div>
       <div class="cart-modal-details">
         <p class="cart-modal-eyebrow">CONFIRMAR PRODUCTO</p>
@@ -152,7 +152,6 @@
               [class.selected]="star <= (hoverRating || selectedRating)"
               [attr.aria-label]="star + ' de 5 estrellas'"
               [attr.aria-pressed]="selectedRating === star"
-              [disabled]="reviewSubmitting"
               (mouseenter)="hoverRating = star"
               (focus)="hoverRating = star"
               (blur)="hoverRating = 0"
@@ -181,11 +180,7 @@
         @if (reviewMessage) {
           <p class="cart-review-success" role="status">{{ reviewMessage }}</p>
         }
-        <button
-          class="cart-review-submit"
-          type="submit"
-          [disabled]="reviewSubmitting"
-        >
+        <button class="cart-review-submit" type="submit" [disabled]="reviewSubmitting">
           {{ reviewSubmitting ? 'Enviando...' : 'Enviar Opinión' }}
         </button>
       </form>

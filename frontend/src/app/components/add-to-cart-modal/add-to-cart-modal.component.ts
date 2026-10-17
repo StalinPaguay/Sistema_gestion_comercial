@@ -5,7 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
-import { Product } from '../../services/product.service';
+import { Product, useProductImageFallback } from '../../services/product.service';
 import { ProductReview, ProductReviews, ReviewService } from '../../services/review.service';
 
 @Component({
@@ -44,6 +44,10 @@ export class AddToCartModalComponent implements OnChanges, OnDestroy {
 
   get isAuthenticated(): boolean {
     return Boolean(this.authService.accessToken());
+  }
+
+  onProductImageError(event: Event): void {
+    useProductImageFallback(event);
   }
 
   ngOnChanges(changes: SimpleChanges): void {

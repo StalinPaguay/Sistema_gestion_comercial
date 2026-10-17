@@ -1,0 +1,26 @@
+<main class="info-page">
+  <header class="info-header">
+    <p class="eyebrow">{{ page().eyebrow }}</p>
+    <h1>{{ page().title }}</h1>
+    <p class="info-intro">{{ page().intro }}</p>
+  </header>
+
+  <article class="info-card">
+    @for (section of page().sections; track section.title) {
+      <section>
+        <h2>{{ section.title }}</h2>
+        @for (paragraph of section.paragraphs; track paragraph) {
+          <p>{{ paragraph }}</p>
+        }
+      </section>
+    }
+    <p class="draft-label">Documento informativo de demostración académica.</p>
+  </article>
+
+  <nav class="info-navigation" aria-label="Más información">
+    <a routerLink="/terminos">Términos de servicio</a>
+    <a routerLink="/privacidad">Política de privacidad</a>
+    <a routerLink="/preguntas-frecuentes">Preguntas frecuentes</a>
+    <a routerLink="/products">Volver al catálogo</a>
+  </nav>
+</main>

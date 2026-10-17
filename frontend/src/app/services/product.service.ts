@@ -2,6 +2,12 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { forkJoin, map, Observable } from 'rxjs';
 import { API_BASE_URL } from './api.config';
+import {
+  getProductImage,
+  PRODUCT_IMAGE_FALLBACK,
+} from './product-images.config';
+
+export { getProductImage, PRODUCT_IMAGE_FALLBACK } from './product-images.config';
 
 export interface Product {
   productoId: number;
@@ -83,27 +89,11 @@ export interface CatalogResult<T> {
   data: T;
 }
 
-const PRODUCT_IMAGE_BY_SKU: Readonly<Record<string, string>> = {
-  'TM-AIRPODS-001':
-    'https://images.unsplash.com/photo-1606220588913-b3aacb4d2f46?auto=format&fit=crop&w=800&q=80',
-  'TM-GPRO-001':
-    'https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?auto=format&fit=crop&w=800&q=80',
-  'TM-IPHONE-001':
-    'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?auto=format&fit=crop&w=800&q=80',
-  'TM-MACBOOK-001':
-    'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80',
-  'TM-MXMASTER-001':
-    'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?auto=format&fit=crop&w=800&q=80',
-  'TM-ROG-001':
-    'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?auto=format&fit=crop&w=800&q=80',
-  'TM-RTX4090-001':
-    'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?auto=format&fit=crop&w=800&q=80',
-  'TM-S24-001':
-    'https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?auto=format&fit=crop&w=800&q=80',
-};
-
-export function getProductImage(sku: string): string {
-  return PRODUCT_IMAGE_BY_SKU[sku.trim().toUpperCase()] ?? '';
+export function useProductImageFallback(event: Event): void {
+  const image = event.currentTarget;
+  if (image instanceof HTMLImageElement && image.getAttribute('src') !== PRODUCT_IMAGE_FALLBACK) {
+    image.src = PRODUCT_IMAGE_FALLBACK;
+  }
 }
 
 @Injectable({ providedIn: 'root' })
@@ -199,30 +189,25 @@ export class ProductService {
   }
 
   private resolveProductImage(product: ApiProduct): string {
-    const skuImage = getProductImage(product.SKU);
-    if (skuImage) {
-      return skuImage;
-    }
-
     const relatedImages = product.ImagenesProducto ?? product.Imagenes ?? [];
-    const imageUrl =
-      product.UrlImagen ??
-      product.ImagenUrl ??
-      product.urlImagen ??
-      product.imagenUrl ??
-      product.Imagen ??
-      relatedImages.find((image) => image.EsPrincipal)?.UrlImagen ??
-      relatedImages[0]?.UrlImagen ??
-      '';
+    const imageUrl = [
+      product.UrlImagen,
+      product.ImagenUrl,
+      product.urlImagen,
+      product.imagenUrl,
+      product.Imagen,
+      relatedImages.find((image) => image.EsPrincipal)?.UrlImagen,
+      relatedImages[0]?.UrlImagen,
+    ].find((candidate) => typeof candidate === 'string' && candidate.trim());
 
-    if (!imageUrl) {
-      return '';
+    if (typeof imageUrl === 'string') {
+      const normalizedImageUrl = imageUrl.trim();
+      if (/^(https?:|data:|blob:)/i.test(normalizedImageUrl)) {
+        return normalizedImageUrl;
+      }
+      return new URL(normalizedImageUrl.replace(/^\/+/, ''), `${API_BASE_URL}/`).toString();
     }
 
-    if (/^(https?:|data:|blob:)/i.test(imageUrl)) {
-      return imageUrl;
-    }
-
-    return new URL(imageUrl.replace(/^\/+/, ''), `${API_BASE_URL}/`).toString();
+    return getProductImage(product.SKU) || PRODUCT_IMAGE_FALLBACK;
   }
 }

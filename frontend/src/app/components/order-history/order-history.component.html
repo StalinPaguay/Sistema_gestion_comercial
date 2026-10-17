@@ -1,0 +1,141 @@
+<main class="orders-page">
+  <header class="orders-header">
+    <div>
+      <p class="eyebrow">PORTAL DEL CLIENTE</p>
+      <h1>Mis pedidos</h1>
+      <p class="orders-subtitle">Consulta el estado y el detalle de tus compras.</p>
+      @if (lastUpdated(); as updated) {
+        <p class="updated-at">Actualizado {{ updated | date: 'shortTime' }} · se actualiza cada 10 segundos</p>
+      }
+    </div>
+    <div class="header-actions">
+      <button type="button" class="refresh-button" (click)="refresh()" [disabled]="loading()">Actualizar</button>
+      <a class="back-link" routerLink="/products">← Volver al catálogo</a>
+    </div>
+  </header>
+
+  @if (confirmationMessage()) {
+    <p class="feedback success" role="status">{{ confirmationMessage() }}</p>
+  }
+
+  @if (cartCleanupWarning()) {
+    <p class="feedback warning" role="alert">{{ cartCleanupWarning() }}</p>
+  }
+
+  @if (errorMessage()) {
+    <p class="feedback error" role="alert">{{ errorMessage() }}</p>
+  }
+
+  @if (loading()) {
+    <section class="empty-state" aria-live="polite">Cargando tu historial de compras…</section>
+  } @else if (!orders().length && !errorMessage()) {
+    <section class="empty-state">
+      <h2>Aún no tienes pedidos</h2>
+      <p>Cuando realices una compra, podrás consultar aquí su estado y detalle.</p>
+      <a class="primary-link" routerLink="/products">Explorar productos</a>
+    </section>
+  } @else {
+    <section class="order-list" aria-label="Historial de pedidos">
+      @for (order of orders(); track order.PedidoId) {
+        <article class="order-card">
+          <div class="order-main">
+            <div>
+              <p class="order-number">Pedido #{{ order.PedidoId }}</p>
+              <p class="order-date">{{ order.FechaPedido | date: 'medium' }}</p>
+            </div>
+            <span class="status" [class]="'status ' + statusClass(order.Estado)">{{ order.Estado }}</span>
+          </div>
+          <div class="order-summary">
+            <span>{{ order.Items.length }} {{ order.Items.length === 1 ? 'producto' : 'productos' }}</span>
+            <strong>{{ orderTotal(order) | currency: 'USD' }}</strong>
+          </div>
+          <div class="order-product-preview" [attr.aria-label]="'Productos del pedido ' + order.PedidoId">
+            @for (item of order.Items; track item.PedidoDetalleId) {
+              <img
+                [src]="productImage(item.SKU)"
+                [alt]="item.Nombre"
+                [title]="item.Nombre"
+                loading="lazy"
+              />
+            }
+          </div>
+          <button
+            class="detail-button"
+            type="button"
+            [attr.aria-expanded]="selectedOrder()?.PedidoId === order.PedidoId"
+            [attr.aria-controls]="selectedOrder()?.PedidoId === order.PedidoId ? 'order-details-dialog' : null"
+            (click)="toggleDetails(order)"
+          >
+            Ver detalle
+          </button>
+        </article>
+      }
+    </section>
+  }
+
+  @if (selectedOrder(); as detail) {
+    <div class="modal-backdrop" (click)="closeDetails()">
+      <section
+        class="order-modal"
+        id="order-details-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="order-modal-title"
+        (click)="$event.stopPropagation()"
+      >
+        <header class="modal-header">
+          <div>
+            <p class="eyebrow">DETALLE DE COMPRA</p>
+            <h2 id="order-modal-title">Pedido #{{ detail.PedidoId }}</h2>
+            <p class="modal-order-meta">
+              {{ detail.FechaPedido | date: 'medium' }} ·
+              <span class="status" [class]="'status ' + statusClass(detail.Estado)">{{ detail.Estado }}</span>
+            </p>
+          </div>
+          <button class="close-button" type="button" aria-label="Cerrar detalle del pedido" autofocus (click)="closeDetails()">
+            <span aria-hidden="true">×</span>
+          </button>
+        </header>
+        @if (detailLoading()) {
+          <p class="modal-feedback" role="status">Cargando el detalle…</p>
+        } @else if (detailError()) {
+          <p class="feedback error" role="alert">{{ detailError() }}</p>
+        } @else {
+          <h3>Productos</h3>
+          <div class="detail-items">
+            @for (item of detail.Items; track item.PedidoDetalleId) {
+              <div class="detail-item">
+                <div class="detail-product">
+                  <img
+                    class="detail-product-image"
+                    [src]="productImage(item.SKU)"
+                    [alt]="'Imagen de ' + item.Nombre"
+                    loading="lazy"
+                  />
+                  <div class="detail-product-info">
+                    <strong>{{ item.Nombre }}</strong>
+                    <span>{{ item.Cantidad }} × {{ item.PrecioUnitario | currency: 'USD' }}</span>
+                  </div>
+                </div>
+                <strong>{{ item.Total | currency: 'USD' }}</strong>
+              </div>
+            }
+          </div>
+          <h3>Pago</h3>
+          <p class="payment-method">Método: {{ paymentMethods(detail) }}</p>
+          @for (payment of detail.Pagos ?? []; track payment.PagoId) {
+            <p class="payment-meta">{{ payment.Estado }} · {{ payment.Monto | currency: 'USD' }}</p>
+          }
+          <div class="totals">
+            <p><span>Subtotal</span><strong>{{ detail.Subtotal | currency: 'USD' }}</strong></p>
+            <p><span>Descuentos</span><strong>−{{ detail.Descuento | currency: 'USD' }}</strong></p>
+            <p><span>IVA (15%)</span><strong>{{ orderTax(detail) | currency: 'USD' }}</strong></p>
+            <p class="grand-total">
+              <span>Total</span><strong>{{ orderTotal(detail) | currency: 'USD' }}</strong>
+            </p>
+          </div>
+        }
+      </section>
+    </div>
+  }
+</main>

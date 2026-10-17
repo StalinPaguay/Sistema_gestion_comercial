@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-labelledby="title">
+  <title id="title">Teléfono inteligente</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#e5f7f6"/>
+      <stop offset="1" stop-color="#cdebe8"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#3194ca"/>
+      <stop offset=".55" stop-color="#536ed0"/>
+      <stop offset="1" stop-color="#a5b8f7"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="480" rx="32" fill="url(#bg)"/>
+  <circle cx="320" cy="226" r="158" fill="#fff" opacity=".43"/>
+  <ellipse cx="320" cy="386" rx="85" ry="17" fill="#579c98" opacity=".2"/>
+  <rect x="226" y="52" width="188" height="355" rx="33" fill="#28374c" stroke="#17243a" stroke-width="8"/>
+  <rect x="238" y="69" width="164" height="320" rx="23" fill="url(#screen)"/>
+  <path d="M239 305c43-29 67-4 101-50 24-33 42-37 62-43v158H238z" fill="#56d1c6" opacity=".85"/>
+  <path d="M239 336c43-36 78-21 112-51 19-17 32-24 51-28v132H238z" fill="#f4bd72" opacity=".92"/>
+  <rect x="291" y="77" width="58" height="10" rx="5" fill="#27364a"/>
+  <circle cx="320" cy="372" r="6" fill="#dbeafe" opacity=".8"/>
+</svg>

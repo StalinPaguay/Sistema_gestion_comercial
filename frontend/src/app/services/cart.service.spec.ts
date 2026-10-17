@@ -130,4 +130,5 @@ describe('CartService guest cart reconciliation', () => {
     expect(service.items()[0]?.apiDetailId).toBeUndefined();
     expect(JSON.parse(localStorage.getItem('tecnomega_cart_v1') ?? '[]')).toHaveLength(1);
   });
+
 });
