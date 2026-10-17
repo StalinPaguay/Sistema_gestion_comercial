@@ -294,6 +294,69 @@
   background: #0047b3;
 }
 
+.checkout-button:disabled,
+.secondary-checkout-button:disabled,
+.cancel-checkout-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.checkout-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.checkout-panel h3 {
+  margin: 0;
+  color: var(--text-primary, #1e293b);
+  font-size: 16px;
+}
+
+.checkout-field {
+  display: grid;
+  gap: 6px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.checkout-field input,
+.checkout-field select {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  color: #1e293b;
+  background: #fff;
+  font: inherit;
+  font-weight: 400;
+}
+
+.address-form { display: grid; gap: 10px; }
+.address-form-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.transfer-demo { display: grid; justify-items: center; gap: 8px; padding: 14px; border: 1px solid #f59e0b; border-radius: 10px; color: #78350f; background: #fffbeb; text-align: center; }
+.transfer-demo h4,.transfer-demo p { margin: 0; }
+.transfer-demo p,.transfer-demo span { font-size: 12px; line-height: 1.5; }
+.transfer-demo img { max-width: min(220px, 100%); height: auto; border-radius: 8px; background: #fff; }
+.card-demo { display: grid; gap: 10px; padding: 14px; border: 1px solid #f59e0b; border-radius: 10px; color: #78350f; background: #fffbeb; }
+.card-demo h4,.card-demo p { margin: 0; }
+.card-demo p { font-size: 12px; line-height: 1.5; }
+.card-demo-fields { display: grid; gap: 10px; }
+.card-demo-fields input { color: #1e293b; background: #fff; }
+.card-demo-fields.show-errors input:invalid { border-color: #dc2626; box-shadow: 0 0 0 2px rgb(220 38 38 / 15%); }
+.card-demo-error,.card-demo-valid { margin: 0; font-size: 12px; font-weight: 700; line-height: 1.5; }
+.card-demo-error { color: #b91c1c; }
+.card-demo-valid { color: #15803d; }
+.checkout-instructions { margin: 0; color: #64748b; font-size: 12px; line-height: 1.5; }
+.secondary-checkout-button,
+.cancel-checkout-button { min-height: 40px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 8px; color: #0759c7; background: #eff6ff; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.cancel-checkout-button { border-color: transparent; color: #64748b; background: transparent; }
+.secondary-checkout-button:hover { background: #dbeafe; }
+
 .secure-note {
   display: flex;
   align-items: center;

@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService, LoginCredentials } from '../../services/auth.service';
 
 @Component({
@@ -15,6 +15,7 @@ export class Login implements OnInit {
   private readonly rememberMeKey = 'tecnomega_remember_me';
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   protected readonly passwordVisible = signal(false);
   protected readonly feedback = signal('');
@@ -58,7 +59,11 @@ export class Login implements OnInit {
     this.authService.login(credentials, formValue.remember).subscribe({
       next: () => {
         this.isSubmitting.set(false);
-        void this.router.navigate(['/products']);
+        const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+        const destination = returnUrl?.startsWith('/') && !returnUrl.startsWith('//')
+          ? returnUrl
+          : '/products';
+        void this.router.navigateByUrl(destination);
       },
       error: (error: HttpErrorResponse) => {
         const detail: unknown = error.error?.detail;

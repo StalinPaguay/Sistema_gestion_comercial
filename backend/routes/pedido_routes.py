@@ -17,6 +17,8 @@ from models.cliente import Cliente
 from models.direccion_cliente import DireccionCliente
 from models.pedido import Pedido
 from models.pedido_detalle import PedidoDetalle
+from models.pago import Pago
+from models.metodo_pago import MetodoPago
 from models.producto import Producto
 from models.promocion import Promocion
 from models.promocion_categoria import PromocionCategoria
@@ -41,6 +43,7 @@ class ItemPedidoEntrada(BaseModel):
 
 class CrearPedidoEntrada(BaseModel):
     DireccionId: int = Field(gt=0, description="Identificador de la dirección de entrega")
+    MetodoPagoId: int | None = Field(default=None, gt=0, description="Método de pago elegido; queda pendiente hasta confirmarse por una pasarela o el personal de la tienda")
     PromocionId: int | None = Field(default=None, description="Identificador de promoción opcional")
     CodigoCupon: str | None = Field(default=None, description="Código de cupón opcional (ej: PROMO10)")
     Items: list[ItemPedidoEntrada] | None = Field(
@@ -96,11 +99,26 @@ def serializar_pedido(pedido: Pedido, db: Session) -> dict[str, Any]:
             "Email": cli.Persona.Email,
         }
 
+    pagos = db.query(Pago).filter(Pago.PedidoId == pedido.PedidoId).all()
+    pagos_info = [
+        {
+            "PagoId": pago.PagoId,
+            "MetodoPagoId": pago.MetodoPagoId,
+            "MetodoPago": pago.MetodoPago.Nombre if pago.MetodoPago else None,
+            "FechaPago": pago.FechaPago.isoformat() if pago.FechaPago else None,
+            "Monto": str(pago.Monto),
+            "Estado": pago.Estado,
+            "TransaccionId": pago.TransaccionId,
+        }
+        for pago in pagos
+    ]
+
     return {
         "PedidoId": pedido.PedidoId,
         "UsuarioId": pedido.UsuarioId,
         "ClienteId": pedido.ClienteId,
         "Cliente": cli_info,
+        "DireccionId": pedido.DireccionId,
         "Direccion": dir_info,
         "FechaPedido": pedido.FechaPedido.isoformat() if pedido.FechaPedido else None,
         "Subtotal": str(pedido.Subtotal),
@@ -109,6 +127,7 @@ def serializar_pedido(pedido: Pedido, db: Session) -> dict[str, Any]:
         "Total": str(pedido.Total),
         "Estado": pedido.Estado,
         "Items": items,
+        "Pagos": pagos_info,
     }
 
 
@@ -197,8 +216,6 @@ def crear_pedido(
 
         # 3. Determinar items (directos o desde el carrito)
         items_a_procesar: list[tuple[int, int]] = []
-        desde_carrito = False
-
         if datos.Items and len(datos.Items) > 0:
             for it in datos.Items:
                 items_a_procesar.append((it.ProductoId, it.Cantidad))
@@ -212,7 +229,12 @@ def crear_pedido(
                 )
             for d in carrito.Detalles:
                 items_a_procesar.append((d.ProductoId, d.Cantidad))
-            desde_carrito = True
+
+        metodo_pago = None
+        if datos.MetodoPagoId is not None:
+            metodo_pago = db.get(MetodoPago, datos.MetodoPagoId)
+            if not metodo_pago or not metodo_pago.Estado:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El método de pago seleccionado no está disponible.")
 
         # 4. Validar stock de cada producto
         detalles_para_crear = []
@@ -315,11 +337,28 @@ def crear_pedido(
 
         db.flush()
 
-        # 8. Si vino del carrito, vaciar el carrito
-        if desde_carrito:
-            carrito = db.query(Carrito).filter(Carrito.ClienteId == cliente.ClienteId).first()
-            if carrito:
-                db.query(DetalleCarrito).filter(DetalleCarrito.CarritoId == carrito.CarritoId).delete()
+        # El trigger de SQL Server actualiza los importes del pedido al insertar los detalles.
+        db.refresh(pedido)
+
+        # Guardar la selección como pago pendiente; no se afirma que haya ocurrido un cobro.
+        if metodo_pago:
+            db.add(Pago(
+                PedidoId=pedido.PedidoId,
+                MetodoPagoId=metodo_pago.MetodoPagoId,
+                FechaPago=datetime.now(),
+                Monto=pedido.Total,
+                Estado="Pendiente",
+            ))
+
+        # Retirar del carrito únicamente los productos que se acaban de pedir.
+        carrito = db.query(Carrito).filter(Carrito.ClienteId == cliente.ClienteId).first()
+        if carrito:
+            producto_ids = list({prod_id for prod_id, _ in items_a_procesar})
+            if producto_ids:
+                db.query(DetalleCarrito).filter(
+                    DetalleCarrito.CarritoId == carrito.CarritoId,
+                    DetalleCarrito.ProductoId.in_(producto_ids),
+                ).delete(synchronize_session=False)
 
         db.commit()
         db.refresh(pedido)

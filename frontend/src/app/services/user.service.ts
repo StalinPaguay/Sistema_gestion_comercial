@@ -20,6 +20,7 @@ export interface UserProfile {
 }
 
 export interface ProfileUpdate {
+  Identificacion: string;
   Nombres: string;
   Apellidos: string;
   Email: string;
@@ -58,8 +59,8 @@ export class UserService {
     });
   }
 
-  updateProfile(clienteId: number, profile: ProfileUpdate): Observable<unknown> {
-    return this.http.patch<unknown>(`${API_BASE_URL}/clientes/${clienteId}`, profile, {
+  updateProfile(profile: ProfileUpdate): Observable<unknown> {
+    return this.http.patch<unknown>(`${API_BASE_URL}/clientes/me`, profile, {
       headers: this.authHeaders(),
     });
   }

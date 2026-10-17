@@ -23,6 +23,13 @@ export const routes: Routes = [
     loadComponent: () => import('./components/cart/cart').then((module) => module.Cart),
   },
   {
+    path: 'order-history',
+    loadComponent: () =>
+      import('./components/order-history/order-history.component').then(
+        (module) => module.OrderHistoryComponent,
+      ),
+  },
+  {
     path: 'favorites',
     loadComponent: () =>
       import('./components/favorites/favorites.component').then(
@@ -38,6 +45,7 @@ export const routes: Routes = [
   },
   { path: 'perfil', pathMatch: 'full', redirectTo: 'profile' },
   { path: 'favoritos', pathMatch: 'full', redirectTo: 'favorites' },
+  { path: 'historial-pedidos', pathMatch: 'full', redirectTo: 'order-history' },
   { path: '', pathMatch: 'full', redirectTo: 'login' },
   { path: '**', redirectTo: 'login' },
 ];

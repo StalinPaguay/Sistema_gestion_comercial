@@ -66,14 +66,12 @@ export class ProfileComponent implements OnInit {
 
   protected saveProfile(form: NgForm): void {
     const current = this.profile();
-    if (!current || current.ClienteId === null || form.invalid || this.savingProfile()) {
-      if (current?.ClienteId === null) {
-        this.errorMessage.set('La cuenta no tiene un perfil de cliente para actualizar.');
-      }
+    if (!current || form.invalid || this.savingProfile()) {
       return;
     }
 
     const update: ProfileUpdate = {
+      Identificacion: String(form.value['Identificacion'] ?? '').trim(),
       Nombres: String(form.value['Nombres']).trim(),
       Apellidos: String(form.value['Apellidos']).trim(),
       Email: String(form.value['Email']).trim(),
@@ -83,10 +81,13 @@ export class ProfileComponent implements OnInit {
     this.successMessage.set('');
     this.savingProfile.set(true);
 
-    this.userService.updateProfile(current.ClienteId, update).subscribe({
+    this.userService.updateProfile(update).subscribe({
       next: (response) => {
         if (this.isProfile(response)) {
           this.profile.set({ ...current, ...response });
+          if (current.ClienteId === null) {
+            this.loadProfile();
+          }
         } else {
           this.profile.set({ ...current, ...update });
         }

@@ -162,20 +162,65 @@
       }
     </div>
 
-    <a
-      class="action-link cart-link"
-      routerLink="/cart"
-      [attr.aria-label]="'Carrito, ' + cartService.count() + ' artículos'"
-      title="Ver carrito"
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M3 4h2l2.2 11.2a2 2 0 0 0 2 1.6h8.6a2 2 0 0 0 1.9-1.4L22 8H6" />
-        <circle cx="10" cy="20" r="1" />
-        <circle cx="18" cy="20" r="1" />
-      </svg>
-      @if (cartService.count() > 0) {
-        <span class="cart-badge" aria-live="polite">{{ cartService.count() }}</span>
+    <div class="cart-menu" #cartMenu>
+      <button
+        class="action-link favorite-trigger cart-trigger"
+        type="button"
+        [attr.aria-label]="'Carrito, ' + cartService.count() + ' artículos'"
+        [attr.aria-expanded]="cartMenuOpen()"
+        aria-controls="cart-popover"
+        title="Carrito y pedidos"
+        (click)="toggleCartMenu()"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 4h2l2.2 11.2a2 2 0 0 0 2 1.6h8.6a2 2 0 0 0 1.9-1.4L22 8H6" />
+          <circle cx="10" cy="20" r="1" />
+          <circle cx="18" cy="20" r="1" />
+        </svg>
+        @if (cartService.count() > 0) {
+          <span class="cart-badge" aria-live="polite">{{ cartService.count() }}</span>
+        }
+      </button>
+      @if (cartMenuOpen()) {
+        <section class="favorites-popover cart-popover" id="cart-popover" aria-label="Resumen del carrito">
+          <header class="popover-header">
+            <h2>Mi carrito</h2>
+            <span>{{ cartService.count() }}</span>
+          </header>
+          @if (cartLoading()) {
+            <p class="popover-empty">Actualizando carrito…</p>
+          }
+          @if (cartPreviewError()) {
+            <p class="popover-message" role="status">{{ cartPreviewError() }}</p>
+          }
+          @if (cartService.items().length) {
+            <ul class="cart-preview-list">
+              @for (item of cartService.items().slice(0, 4); track item.product.productoId) {
+                <li>
+                  <img [src]="item.product.urlImagen" [alt]="item.product.nombre" width="48" height="48" />
+                  <span class="cart-preview-info">
+                    <strong>{{ item.product.nombre }}</strong>
+                    <small>{{ item.quantity }} × {{ item.product.precio | currency: 'USD' }}</small>
+                  </span>
+                  <b>{{ item.quantity * item.product.precio | currency: 'USD' }}</b>
+                </li>
+              }
+            </ul>
+            @if (cartService.items().length > 4) {
+              <p class="popover-more-count">Y {{ cartService.items().length - 4 }} productos más en tu carrito</p>
+            }
+            <p class="cart-preview-total"><span>Subtotal</span><strong>{{ cartService.subtotal() | currency: 'USD' }}</strong></p>
+          } @else {
+            @if (!cartLoading()) {
+              <p class="popover-empty">Tu carrito está vacío. Explora el catálogo y agrega productos.</p>
+            }
+          }
+          <div class="cart-popover-actions">
+            <button class="popover-footer" type="button" (click)="openCart()">Ir al carrito</button>
+            <button class="cart-popover-secondary" type="button" (click)="openOrderHistory()">Ver historial</button>
+          </div>
+        </section>
       }
-    </a>
+    </div>
   </div>
 </header>

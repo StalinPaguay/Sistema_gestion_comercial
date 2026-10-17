@@ -90,10 +90,118 @@
           <span>Total</span>
           <strong>{{ cartService.total() | currency: 'USD' }}</strong>
         </div>
-        <button class="checkout-button" type="button" (click)="checkout()">
-          Proceder al Pago
+        <button
+          *ngIf="!checkoutDetailsOpen()"
+          class="checkout-button"
+          type="button"
+          [disabled]="checkoutLoading()"
+          (click)="checkout()"
+        >
+          {{ checkoutLoading() ? 'Preparando pedido…' : 'Proceder al Pago' }}
           <span aria-hidden="true">→</span>
         </button>
+
+        <section *ngIf="checkoutDetailsOpen()" class="checkout-panel" aria-label="Confirmar pedido">
+          <h3>Entrega y pago</h3>
+          <ng-container *ngIf="addresses().length; else noSavedAddress">
+            <label class="checkout-field">
+              Dirección de entrega
+              <select [value]="selectedAddressId() ?? ''" (change)="selectAddress($event)">
+                <option *ngFor="let address of addresses()" [value]="address.DireccionId">
+                  {{ address.Direccion }}<ng-container *ngIf="address.Ciudad"> · {{ address.Ciudad }}</ng-container>
+                  {{ address.EsPrincipal ? ' (Principal)' : '' }}
+                </option>
+              </select>
+            </label>
+            <button *ngIf="!addressFormOpen()" class="secondary-checkout-button" type="button" (click)="openAddressForm()">
+              + Agregar otra dirección
+            </button>
+          </ng-container>
+          <ng-template #noSavedAddress>
+            <p class="checkout-instructions">Necesitamos una dirección para registrar el pedido.</p>
+          </ng-template>
+          <div *ngIf="addressFormOpen()" class="address-form">
+            <label class="checkout-field">
+              Dirección <span aria-hidden="true">*</span>
+              <input type="text" required maxlength="250" [value]="addressDraft.Direccion" (input)="updateAddressField('Direccion', $event)" placeholder="Calle y número" />
+            </label>
+            <label class="checkout-field">
+              Ciudad
+              <input type="text" maxlength="100" [value]="addressDraft.Ciudad" (input)="updateAddressField('Ciudad', $event)" placeholder="Ciudad" />
+            </label>
+            <label class="checkout-field">
+              Provincia
+              <input type="text" maxlength="100" [value]="addressDraft.Provincia" (input)="updateAddressField('Provincia', $event)" placeholder="Provincia" />
+            </label>
+            <label class="checkout-field">
+              Referencia
+              <input type="text" maxlength="250" [value]="addressDraft.Referencia" (input)="updateAddressField('Referencia', $event)" placeholder="Referencia de entrega (opcional)" />
+            </label>
+            <div class="address-form-actions">
+              <button class="secondary-checkout-button" type="button" [disabled]="addressSaving()" (click)="saveAddress()">
+                {{ addressSaving() ? 'Guardando…' : 'Guardar dirección' }}
+              </button>
+              <button *ngIf="addresses().length" class="cancel-checkout-button" type="button" [disabled]="addressSaving()" (click)="cancelAddressForm()">
+                Cancelar
+              </button>
+            </div>
+          </div>
+
+          <label *ngIf="paymentMethods().length" class="checkout-field">
+            Método de pago
+            <select [value]="selectedPaymentMethodId() ?? ''" (change)="selectPaymentMethod($event)">
+              <option *ngFor="let method of paymentMethods()" [value]="method.MetodoPagoId">{{ method.Nombre }}</option>
+            </select>
+          </label>
+          <section *ngIf="transferDemoQrLoading() || transferDemoQr()" class="transfer-demo" aria-live="polite">
+            <h4>QR de demostración</h4>
+            <p>Este código solo muestra una referencia de prueba al escanearlo. No envía dinero ni confirma el pago.</p>
+            <img *ngIf="transferDemoQr()" [src]="transferDemoQr()" alt="QR de demostración, no válido para pagar" width="220" height="220" />
+            <span *ngIf="transferDemoQrLoading()">Generando QR…</span>
+          </section>
+          <section *ngIf="isCardPaymentSelected()" class="card-demo" aria-labelledby="card-demo-title">
+            <h4 id="card-demo-title">Datos de tarjeta (demostración)</h4>
+            <p>No uses una tarjeta real. Estos campos solo se validan en tu navegador: no se envían ni se guardan. El pedido queda pendiente y no se realiza ningún cobro.</p>
+            <form #cardDemoForm class="card-demo-fields" [class.show-errors]="cardDemoSubmitted()" autocomplete="off" (input)="validateDemoCard($event)">
+              <label class="checkout-field">
+                Titular de prueba
+                <input type="text" required minlength="2" maxlength="100" placeholder="Nombre ficticio" />
+              </label>
+              <label class="checkout-field">
+                Número de tarjeta de prueba
+                <input type="text" inputmode="numeric" required minlength="13" maxlength="23" pattern="[0-9 ]{13,23}" placeholder="Solo números ficticios" />
+              </label>
+              <label class="checkout-field">
+                Vencimiento
+                <input type="text" inputmode="numeric" required maxlength="5" pattern="(0[1-9]|1[0-2])/[0-9]{2}" placeholder="MM/AA" (input)="formatDemoCardExpiry($event)" />
+              </label>
+              <label class="checkout-field">
+                CVV de prueba
+                <input type="password" inputmode="numeric" required minlength="3" maxlength="4" pattern="[0-9]{3,4}" placeholder="•••" />
+              </label>
+            </form>
+            <p *ngIf="cardDemoSubmitted() && cardDemoErrors().length" class="card-demo-error" role="alert">
+              Revisa estos campos: {{ cardDemoErrors().join(', ') }}.
+            </p>
+            <p *ngIf="cardDemoSubmitted() && cardDemoValid()" class="card-demo-valid" role="status">
+              Los campos de demostración están completos.
+            </p>
+          </section>
+          <p class="checkout-instructions">
+            Al confirmar, se crea tu pedido con estado Pendiente y el método elegido queda registrado como pago pendiente.
+            Esta versión no realiza cobros en línea.
+          </p>
+          <button
+            *ngIf="addresses().length && paymentMethods().length"
+            class="checkout-button"
+            type="button"
+            [disabled]="orderSubmitting()"
+            (click)="confirmOrder()"
+          >
+            {{ orderSubmitting() ? 'Creando pedido…' : 'Confirmar pedido' }}
+          </button>
+          <button class="cancel-checkout-button" type="button" [disabled]="orderSubmitting()" (click)="cancelCheckout()">Cancelar</button>
+        </section>
         <div class="secure-note">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="m12 3 8 3v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6z" />

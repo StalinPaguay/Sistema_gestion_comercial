@@ -6,13 +6,13 @@ import { AuthService } from './services/auth.service';
 import { API_BASE_URL } from './services/api.config';
 
 const authInterceptor: HttpInterceptorFn = (request, next) => {
-  if (!request.url.startsWith(`${API_BASE_URL}/carrito`)) {
+  if (!request.url.startsWith(`${API_BASE_URL}/`)) {
     return next(request);
   }
 
   const token = inject(AuthService).accessToken();
   return next(
-    token
+    token && !request.headers.has('Authorization')
       ? request.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
       : request,
   );

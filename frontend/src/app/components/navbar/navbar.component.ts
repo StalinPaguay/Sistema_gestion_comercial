@@ -23,12 +23,16 @@ export class NavbarComponent implements OnInit {
   protected readonly favoritesOpen = signal(false);
   protected readonly accountMenuOpen = signal(false);
   protected readonly cartMessage = signal('');
+  protected readonly cartMenuOpen = signal(false);
+  protected readonly cartLoading = signal(false);
+  protected readonly cartPreviewError = signal('');
   protected readonly themeService = inject(ThemeService);
   private readonly productService = inject(ProductService);
   private readonly router = inject(Router);
   protected readonly authService = inject(AuthService);
   @ViewChild('favoritesMenu') private favoritesMenu?: ElementRef<HTMLElement>;
   @ViewChild('accountMenu') private accountMenu?: ElementRef<HTMLElement>;
+  @ViewChild('cartMenu') private cartMenu?: ElementRef<HTMLElement>;
 
   @HostListener('document:click', ['$event'])
   closeFavoritesOnOutsideClick(event: MouseEvent): void {
@@ -47,12 +51,16 @@ export class NavbarComponent implements OnInit {
     ) {
       this.accountMenuOpen.set(false);
     }
+    if (this.cartMenuOpen() && target instanceof Node && !this.cartMenu?.nativeElement.contains(target)) {
+      this.cartMenuOpen.set(false);
+    }
   }
 
   @HostListener('document:keydown.escape')
   closeFavoritesOnEscape(): void {
     this.favoritesOpen.set(false);
     this.accountMenuOpen.set(false);
+    this.cartMenuOpen.set(false);
   }
 
   ngOnInit(): void {
@@ -80,7 +88,31 @@ export class NavbarComponent implements OnInit {
   toggleFavorites(): void {
     this.favoritesOpen.update((open) => !open);
     this.accountMenuOpen.set(false);
+    this.cartMenuOpen.set(false);
     this.cartMessage.set('');
+  }
+
+  toggleCartMenu(): void {
+    this.cartMenuOpen.update((open) => !open);
+    this.favoritesOpen.set(false);
+    this.accountMenuOpen.set(false);
+    if (this.cartMenuOpen()) {
+      this.loadRemoteCartPreview();
+    }
+  }
+
+  openOrderHistory(): void {
+    this.cartMenuOpen.set(false);
+    if (!this.authService.accessToken()) {
+      void this.router.navigate(['/login'], { queryParams: { returnUrl: '/order-history' } });
+      return;
+    }
+    void this.router.navigate(['/order-history']);
+  }
+
+  openCart(): void {
+    this.cartMenuOpen.set(false);
+    void this.router.navigate(['/cart']);
   }
 
   toggleAccountMenu(): void {
@@ -138,5 +170,28 @@ export class NavbarComponent implements OnInit {
     }
 
     this.cartMessage.set('No se pudo agregar el producto al carrito.');
+  }
+
+  private loadRemoteCartPreview(): void {
+    this.cartPreviewError.set('');
+    if (!this.authService.accessToken()) return;
+
+    this.cartLoading.set(true);
+    this.cartService.getRemoteCart().subscribe({
+      next: (response) => {
+        if (response.Items.length || !this.cartService.items().length) {
+          this.cartService.syncFromApi(response, this.favoritesService.getFavorites());
+        }
+        this.cartLoading.set(false);
+      },
+      error: (error: unknown) => {
+        this.cartPreviewError.set(
+          error instanceof HttpErrorResponse && error.status === 0
+            ? 'No se pudo actualizar el carrito desde el servidor; se muestran los artículos guardados en este navegador.'
+            : 'No se pudo actualizar el carrito; se muestran los artículos guardados en este navegador.',
+        );
+        this.cartLoading.set(false);
+      },
+    });
   }
 }

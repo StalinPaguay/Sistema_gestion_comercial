@@ -344,7 +344,13 @@ def agregar_mi_direccion(
 ):
     cliente = db.query(Cliente).filter(Cliente.PersonaId == usuario.PersonaId).first()
     if not cliente:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Perfil de cliente no encontrado.")
+        cliente = Cliente(
+            PersonaId=usuario.PersonaId,
+            Identificacion=f"CLI-{usuario.UsuarioId:06d}",
+            Estado=True,
+        )
+        db.add(cliente)
+        db.flush()
 
     if datos.EsPrincipal:
         db.query(DireccionCliente).filter(
