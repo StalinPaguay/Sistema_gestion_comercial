@@ -33,8 +33,20 @@ export class OrderHistoryComponent implements OnInit, OnDestroy {
   protected readonly lastUpdated = signal<Date | null>(null);
   protected readonly confirmationMessage = signal('');
   protected readonly cartCleanupWarning = signal('');
+  protected readonly clientNotifications = signal<
+    Array<{
+      notificacionId: number;
+      pedidoId: number;
+      clienteEmail: string;
+      clienteNombre?: string;
+      estado: string;
+      motivo: string;
+      fecha: string;
+    }>
+  >([]);
 
   ngOnInit(): void {
+    this.loadClientNotifications();
     const createdOrderId = this.route.snapshot.queryParamMap.get('pedido');
     if (createdOrderId) {
       this.confirmationMessage.set(
@@ -201,5 +213,32 @@ export class OrderHistoryComponent implements OnInit, OnDestroy {
       }
     }
     return 'No se pudo cargar la información del pedido.';
+  }
+
+  private loadClientNotifications(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const stored = localStorage.getItem('tecnomega_client_notifications');
+      if (stored) {
+        const notifs = JSON.parse(stored);
+        const userEmail = this.authService.currentUser()?.Email?.toLowerCase();
+        if (Array.isArray(notifs)) {
+          const userNotifs = notifs.filter(
+            (n: any) => !userEmail || !n.clienteEmail || n.clienteEmail.toLowerCase() === userEmail
+          );
+          this.clientNotifications.set(userNotifs);
+        }
+      }
+    } catch {}
+  }
+
+  protected dismissNotification(id: number): void {
+    const updated = this.clientNotifications().filter((n) => n.notificacionId !== id);
+    this.clientNotifications.set(updated);
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('tecnomega_client_notifications', JSON.stringify(updated));
+      } catch {}
+    }
   }
 }

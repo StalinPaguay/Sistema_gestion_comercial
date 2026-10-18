@@ -1,0 +1,1318 @@
+<div class="admin-wrapper" [class.dark-theme]="themeService.theme() === 'dark'">
+  <!-- Topbar -->
+  <header class="admin-topbar">
+    <div class="topbar-brand">
+      <a routerLink="/products" class="brand-logo" title="Hacer clic para volver a la tienda TECNOMEGA" style="text-decoration: none; cursor: pointer;">
+        <span class="logo-tecno">TECNO</span><span class="logo-mega">MEGA</span>
+        <span class="admin-badge">ADMIN</span>
+      </a>
+    </div>
+
+    <!-- Alertas globales -->
+    @if (alertMessage()) {
+      <div class="global-alert" [class.alert-danger]="alertType() === 'danger'">
+        <span>{{ alertMessage() }}</span>
+        <button type="button" (click)="alertMessage.set('')">×</button>
+      </div>
+    }
+
+    <div class="topbar-actions">
+      <button type="button" class="btn-store-link btn-sync" (click)="manualRefresh()" title="Sincronizar pedidos y clientes en tiempo real">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+        </svg>
+        <span>Sincronizar</span>
+      </button>
+
+      <a routerLink="/products" class="btn-store-link" title="Ir a la tienda como cliente">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+        <span>Ver Tienda</span>
+      </a>
+
+      <button class="icon-btn theme-btn" (click)="themeService.toggleTheme()" [title]="themeService.theme() === 'dark' ? 'Modo Claro' : 'Modo Oscuro'">
+        @if (themeService.theme() === 'dark') {
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        } @else {
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        }
+      </button>
+
+      <div class="admin-profile">
+        <div class="admin-avatar">A</div>
+        <div class="admin-info">
+          <strong>{{ authService.currentUser()?.Nombres || 'Administrador' }}</strong>
+          <small>{{ authService.currentUser()?.Email || 'admin@tecnomega.com' }}</small>
+        </div>
+      </div>
+
+      <button class="btn-logout" (click)="logout()" title="Cerrar Sesión">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Contenedor Principal (Sidebar + Contenido) -->
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <nav class="sidebar-nav">
+        <button class="nav-item" [class.active]="currentTab() === 'dashboard'" (click)="setTab('dashboard')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+          <span>Estadísticas</span>
+        </button>
+
+        <button class="nav-item" [class.active]="currentTab() === 'orders'" (click)="setTab('orders')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          <span>Gestión Pedidos</span>
+          @if (adminService.stats()?.pedidosPendientes) {
+            <span class="warning-badge" title="Pedidos pendientes o en curso">{{ adminService.stats()?.pedidosPendientes }}</span>
+          }
+        </button>
+
+        <button class="nav-item" [class.active]="currentTab() === 'products'" (click)="setTab('products')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          <span>Productos</span>
+          <span class="count-badge">{{ adminService.products().length }}</span>
+        </button>
+
+        <button class="nav-item" [class.active]="currentTab() === 'categories'" (click)="setTab('categories')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          <span>Categorías</span>
+        </button>
+
+        <button class="nav-item" [class.active]="currentTab() === 'inventory'" (click)="setTab('inventory')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          <span>Inventario</span>
+          @if (adminService.stats()?.productosStockBajo) {
+            <span class="warning-badge" title="Productos con stock bajo">{{ adminService.stats()?.productosStockBajo }}</span>
+          }
+        </button>
+
+        <button class="nav-item" [class.active]="currentTab() === 'promotions'" (click)="setTab('promotions')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+          <span>Promociones</span>
+        </button>
+
+        <button class="nav-item" [class.active]="currentTab() === 'suppliers'" (click)="setTab('suppliers')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          <span>Proveedores</span>
+        </button>
+
+        <button class="nav-item" [class.active]="currentTab() === 'clients'" (click)="setTab('clients')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Clientes</span>
+        </button>
+
+        <button class="nav-item" [class.active]="currentTab() === 'billing'" (click)="setTab('billing')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span>Facturación</span>
+        </button>
+      </nav>
+    </aside>
+
+    <!-- Contenido Central Dinámico -->
+    <main class="admin-content">
+
+      <!-- ============================================== -->
+      <!-- TAB 1: DASHBOARD / ESTADÍSTICAS (RF39, RF40)   -->
+      <!-- ============================================== -->
+      @if (currentTab() === 'dashboard') {
+        <section class="tab-panel">
+          <div class="panel-header">
+            <div>
+              <h1 class="panel-title">Panel de Control General</h1>
+              <p class="panel-subtitle">Métricas en tiempo real del sistema comercial TECNOMEGA</p>
+            </div>
+            <button class="btn btn-primary" (click)="openNewProductModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nuevo Producto
+            </button>
+          </div>
+
+          <!-- Cards de Métricas Principales (KPIs) -->
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-icon icon-revenue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              </div>
+              <div class="kpi-info">
+                <span>Ventas Totales</span>
+                <h3>{{ adminService.stats()?.totalVentas | currency:'USD' }}</h3>
+                <small class="kpi-meta text-success">Facturación acumulada</small>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-icon icon-orders">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+              </div>
+              <div class="kpi-info">
+                <span>Facturas Registradas</span>
+                <h3>{{ adminService.stats()?.totalPedidos }}</h3>
+                <small class="kpi-meta">Transacciones procesadas</small>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-icon icon-products">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/></svg>
+              </div>
+              <div class="kpi-info">
+                <span>Total Productos</span>
+                <h3>{{ adminService.stats()?.totalProductos }}</h3>
+                <small class="kpi-meta">En catálogo</small>
+              </div>
+            </div>
+
+            <div class="kpi-card" [class.card-alert]="(adminService.stats()?.productosStockBajo || 0) > 0">
+              <div class="kpi-icon icon-warning">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </div>
+              <div class="kpi-info">
+                <span>Stock Crítico / Bajo</span>
+                <h3>{{ adminService.stats()?.productosStockBajo }}</h3>
+                <small class="kpi-meta text-danger">Requiere reabastecimiento</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Gráficos y Distribución -->
+          <div class="dashboard-split">
+            <!-- Categorías -->
+            <div class="dashboard-card">
+              <div class="card-header">
+                <h3>Distribución de Productos por Categoría</h3>
+              </div>
+              <div class="category-bars">
+                @for (cat of adminService.stats()?.ventasPorCategoria; track cat.categoria) {
+                  <div class="cat-bar-item">
+                    <div class="cat-bar-label">
+                      <span>{{ cat.categoria }}</span>
+                      <strong>{{ cat.total }} productos ({{ cat.porcentaje }}%)</strong>
+                    </div>
+                    <div class="progress-track">
+                      <div class="progress-fill" [style.width.%]="cat.porcentaje"></div>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <!-- Alertas de Stock Bajo -->
+            <div class="dashboard-card">
+              <div class="card-header">
+                <h3>Alertas de Inventario Inmediatas</h3>
+                <button class="btn btn-sm btn-outline" (click)="setTab('inventory')">Ver Todos</button>
+              </div>
+              <div class="critical-stock-list">
+                @if ((adminService.stats()?.productosCriticos?.length || 0) === 0) {
+                  <p class="empty-state-text">Todo el inventario se encuentra por encima del stock mínimo.</p>
+                } @else {
+                  @for (prod of adminService.stats()?.productosCriticos; track prod.productoId) {
+                    <div class="critical-item">
+                      <img [src]="prod.urlImagen" [alt]="prod.nombre" class="tiny-thumb" (error)="handleImageError($event, prod.sku)" />
+                      <div class="critical-details">
+                        <strong class="critical-name">{{ prod.nombre }}</strong>
+                        <span class="stock-badge danger">Stock actual: {{ prod.stock }} — Mínimo: {{ prod.stockMinimo }}</span>
+                      </div>
+                      <button class="btn btn-sm btn-primary critical-action" (click)="openMovementModal(prod)">Reabastecer</button>
+                    </div>
+                  }
+                }
+              </div>
+            </div>
+          </div>
+        </section>
+      }
+
+      <!-- ============================================== -->
+      <!-- TAB PEDIDOS: GESTIÓN Y BLOQUEO DE PEDIDOS      -->
+      <!-- ============================================== -->
+      @if (currentTab() === 'orders') {
+        <section class="tab-panel">
+          <div class="panel-header">
+            <div>
+              <h1 class="panel-title">Control y Monitoreo de Pedidos</h1>
+              <p class="panel-subtitle">Supervisión de estados en curso, despacho, bloqueo preventivo y cancelación con aviso al cliente</p>
+            </div>
+          </div>
+
+          <!-- Filtro por Estado de Pedido -->
+          <div class="filter-tabs">
+            <button class="filter-tab-btn" [class.active]="orderStatusFilter() === 'Todos'" (click)="orderStatusFilter.set('Todos')">
+              Todos ({{ adminService.orders().length }})
+            </button>
+            <button class="filter-tab-btn" [class.active]="orderStatusFilter() === 'Pendiente'" (click)="orderStatusFilter.set('Pendiente')">
+              Pendientes
+            </button>
+            <button class="filter-tab-btn" [class.active]="orderStatusFilter() === 'Procesando'" (click)="orderStatusFilter.set('Procesando')">
+              En Preparación
+            </button>
+            <button class="filter-tab-btn" [class.active]="orderStatusFilter() === 'Enviado'" (click)="orderStatusFilter.set('Enviado')">
+              Enviados
+            </button>
+            <button class="filter-tab-btn" [class.active]="orderStatusFilter() === 'Entregado'" (click)="orderStatusFilter.set('Entregado')">
+              Entregados
+            </button>
+            <button class="filter-tab-btn" [class.active]="orderStatusFilter() === 'Bloqueado'" (click)="orderStatusFilter.set('Bloqueado')">
+              Bloqueados
+            </button>
+            <button class="filter-tab-btn" [class.active]="orderStatusFilter() === 'Cancelado'" (click)="orderStatusFilter.set('Cancelado')">
+              Cancelados
+            </button>
+          </div>
+
+          <!-- Tabla de Pedidos -->
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>N° Pedido</th>
+                  <th>Fecha</th>
+                  <th>Cliente</th>
+                  <th>Dirección Entrega</th>
+                  <th>Total</th>
+                  <th>Estado Actual</th>
+                  <th class="text-right">Control de Estado / Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                @if (filteredOrders().length === 0) {
+                  <tr>
+                    <td colspan="7" class="text-center py-4">No hay pedidos registrados con el estado seleccionado.</td>
+                  </tr>
+                }
+                @for (order of filteredOrders(); track order.pedidoId) {
+                  <tr>
+                    <td>
+                      <strong>{{ order.numero }}</strong>
+                      <div><small class="text-muted">{{ order.items.length }} producto(s)</small></div>
+                    </td>
+                    <td><small>{{ order.fecha }}</small></td>
+                    <td>
+                      <div><strong>{{ order.clienteNombre }}</strong></div>
+                      <small>{{ order.clienteEmail }}</small>
+                    </td>
+                    <td><small>{{ order.direccion }}</small></td>
+                    <td><strong class="total-highlight">{{ order.total | currency:'USD' }}</strong></td>
+                    <td>
+                      <span class="badge"
+                        [class.badge-warning]="order.estado === 'Pendiente' || order.estado === 'Procesando'"
+                        [class.badge-success]="order.estado === 'Enviado' || order.estado === 'Entregado'"
+                        [class.badge-danger]="order.estado === 'Cancelado' || order.estado === 'Bloqueado'">
+                        {{ order.estado }}
+                      </span>
+                      @if (order.motivoBloqueo) {
+                        <div class="order-block-note" title="Motivo registrado">
+                          ⚠️ {{ order.motivoBloqueo }}
+                        </div>
+                      }
+                    </td>
+                    <td class="text-right actions-cell">
+                      <!-- Dropdown de avance de estado -->
+                      <select class="status-quick-select" [value]="order.estado" (change)="changeOrderStatus(order, $any($event.target).value)">
+                        <option value="Pendiente">Pendiente</option>
+                        <option value="Procesando">En Preparación</option>
+                        <option value="Enviado">Enviado</option>
+                        <option value="Entregado">Entregado</option>
+                        <option value="Bloqueado">⛔ Bloquear</option>
+                        <option value="Cancelado">❌ Cancelar</option>
+                      </select>
+
+                      <button class="btn btn-sm btn-outline" (click)="viewOrderDetail(order)" title="Ver productos comprados">
+                        Ver
+                      </button>
+
+                      @if (order.estado !== 'Bloqueado' && order.estado !== 'Cancelado') {
+                        <button class="btn btn-sm btn-danger" (click)="openBlockOrderModal(order, 'Bloqueado')" title="Bloquear pedido preventivamente">
+                          Bloquear
+                        </button>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      }
+
+      <!-- ============================================== -->
+      <!-- TAB 2: PRODUCTOS (RF05, RF06, RF07, RF09)      -->
+      <!-- ============================================== -->
+      @if (currentTab() === 'products') {
+        <section class="tab-panel">
+          <div class="panel-header">
+            <div>
+              <h1 class="panel-title">Gestión de Catálogo de Productos</h1>
+              <p class="panel-subtitle">Registro, edición de precios, control de inventario y estado</p>
+            </div>
+            <button class="btn btn-primary" (click)="openNewProductModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Registrar Producto
+            </button>
+          </div>
+
+          <!-- Filtros de búsqueda y categorías -->
+          <div class="filters-bar">
+            <div class="search-input-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input
+                type="text"
+                placeholder="Buscar por nombre, SKU o marca..."
+                [value]="productSearch()"
+                (input)="productSearch.set($any($event.target).value)"
+              />
+            </div>
+
+            <div class="filter-group">
+              <label>Categoría:</label>
+              <select (change)="productCategoryFilter.set($any($event.target).value)">
+                <option value="Todas">Todas las categorías</option>
+                @for (c of adminService.categories(); track c.categoriaId) {
+                  <option [value]="c.nombre">{{ c.nombre }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label>Estado:</label>
+              <select (change)="productStatusFilter.set($any($event.target).value)">
+                <option value="Todos">Todos</option>
+                <option value="Activos">Solo Activos</option>
+                <option value="Inactivos">Solo Inactivos</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Tabla de Productos -->
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>SKU</th>
+                  <th>Categoría</th>
+                  <th>Precio</th>
+                  <th>Stock</th>
+                  <th>Mínimo</th>
+                  <th>Estado</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                @if (filteredProducts().length === 0) {
+                  <tr>
+                    <td colspan="8" class="text-center py-4">No se encontraron productos que coincidan con los filtros.</td>
+                  </tr>
+                }
+                @for (prod of filteredProducts(); track prod.productoId) {
+                  <tr>
+                    <td class="product-cell">
+                      <img [src]="prod.urlImagen" [alt]="prod.nombre" class="table-thumb" (error)="handleImageError($event, prod.sku)" />
+                      <div>
+                        <strong>{{ prod.nombre }}</strong>
+                        <small>{{ prod.marca }}</small>
+                      </div>
+                    </td>
+                    <td><code>{{ prod.sku }}</code></td>
+                    <td><span class="badge badge-neutral">{{ prod.categoria }}</span></td>
+                    <td><strong>{{ prod.precio | currency:'USD' }}</strong></td>
+                    <td>
+                      <span class="stock-pill" [class.stock-danger]="prod.stock <= prod.stockMinimo" [class.stock-ok]="prod.stock > prod.stockMinimo">
+                        {{ prod.stock }} unid.
+                      </span>
+                    </td>
+                    <td>{{ prod.stockMinimo }}</td>
+                    <td>
+                      <span class="status-indicator" [class.active]="prod.estado">
+                        {{ prod.estado ? 'Activo' : 'Inactivo' }}
+                      </span>
+                    </td>
+                    <td class="text-right actions-cell">
+                      <button class="btn-action edit" (click)="openEditProductModal(prod)" title="Editar Producto">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                      </button>
+                      <button class="btn-action" [class.toggle-off]="prod.estado" [class.toggle-on]="!prod.estado" (click)="toggleProductState(prod)" [title]="prod.estado ? 'Desactivar producto' : 'Activar producto'">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      }
+
+      <!-- ============================================== -->
+      <!-- TAB 3: CATEGORÍAS (RF08)                        -->
+      <!-- ============================================== -->
+      @if (currentTab() === 'categories') {
+        <section class="tab-panel">
+          <div class="panel-header">
+            <div>
+              <h1 class="panel-title">Módulo de Categorías</h1>
+              <p class="panel-subtitle">Organización y clasificación jerárquica del catálogo</p>
+            </div>
+            <button class="btn btn-primary" (click)="openNewCategoryModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nueva Categoría
+            </button>
+          </div>
+
+          <div class="cards-grid">
+            @for (cat of adminService.categories(); track cat.categoriaId) {
+              <div class="entity-card">
+                <div class="entity-card-header">
+                  <h3>{{ cat.nombre }}</h3>
+                  <span class="status-indicator" [class.active]="cat.estado">{{ cat.estado ? 'Activa' : 'Inactiva' }}</span>
+                </div>
+                <p class="entity-card-desc">{{ cat.descripcion }}</p>
+                <div class="entity-card-footer">
+                  <button class="btn btn-sm btn-outline" (click)="openEditCategoryModal(cat)">Editar</button>
+                  <button class="btn btn-sm" [class.btn-danger]="cat.estado" [class.btn-secondary]="!cat.estado" (click)="toggleCategoryState(cat)">
+                    {{ cat.estado ? 'Desactivar' : 'Activar' }}
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </section>
+      }
+
+      <!-- ============================================== -->
+      <!-- TAB 4: INVENTARIO (RF13, RF14, RF16, RF17)      -->
+      <!-- ============================================== -->
+      @if (currentTab() === 'inventory') {
+        <section class="tab-panel">
+          <div class="panel-header">
+            <div>
+              <h1 class="panel-title">Control de Inventario y Movimientos</h1>
+              <p class="panel-subtitle">Entradas, salidas, ajustes de bodega y detección de stock crítico</p>
+            </div>
+            <button class="btn btn-primary" (click)="openMovementModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Registrar Movimiento
+            </button>
+          </div>
+
+          <!-- Selector de filtro de existencias -->
+          <div class="filter-tabs">
+            <button class="filter-tab-btn" [class.active]="inventoryFilter() === 'Todos'" (click)="inventoryFilter.set('Todos')">
+              Todos los Productos ({{ adminService.products().length }})
+            </button>
+            <button class="filter-tab-btn" [class.active]="inventoryFilter() === 'BajoStock'" (click)="inventoryFilter.set('BajoStock')">
+              Stock Bajo ({{ adminService.stats()?.productosStockBajo }})
+            </button>
+            <button class="filter-tab-btn" [class.active]="inventoryFilter() === 'Agotados'" (click)="inventoryFilter.set('Agotados')">
+              Agotados
+            </button>
+          </div>
+
+          <!-- Tabla de Existencias Actuales -->
+          <div class="data-table-container mb-6">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>SKU</th>
+                  <th>Categoría</th>
+                  <th>Stock Actual</th>
+                  <th>Stock Mínimo</th>
+                  <th>Diagnóstico</th>
+                  <th class="text-right">Acción Rápida</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (prod of filteredInventoryProducts(); track prod.productoId) {
+                  <tr>
+                    <td><strong>{{ prod.nombre }}</strong></td>
+                    <td><code>{{ prod.sku }}</code></td>
+                    <td>{{ prod.categoria }}</td>
+                    <td>
+                      <strong [class.text-danger]="prod.stock <= prod.stockMinimo">{{ prod.stock }} unidades</strong>
+                    </td>
+                    <td>{{ prod.stockMinimo }} unidades</td>
+                    <td>
+                      @if (prod.stock === 0) {
+                        <span class="badge badge-danger">AGOTADO</span>
+                      } @else if (prod.stock <= prod.stockMinimo) {
+                        <span class="badge badge-warning">STOCK BAJO</span>
+                      } @else {
+                        <span class="badge badge-success">ÓPTIMO</span>
+                      }
+                    </td>
+                    <td class="text-right">
+                      <button class="btn btn-sm btn-outline" (click)="openMovementModal(prod)">Ajustar / Cargar</button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Historial de Movimientos de Inventario -->
+          <div class="panel-section-title">
+            <h3>Historial de Movimientos Registrados</h3>
+          </div>
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Producto</th>
+                  <th>Tipo</th>
+                  <th>Cantidad</th>
+                  <th>Stock Resultante</th>
+                  <th>Motivo</th>
+                  <th>Proveedor / Referencia</th>
+                  <th>Responsable</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (mov of adminService.inventoryMovements(); track mov.movimientoId) {
+                  <tr>
+                    <td><small>{{ mov.fecha }}</small></td>
+                    <td><strong>{{ mov.productoNombre }}</strong></td>
+                    <td>
+                      <span class="badge" [class.badge-success]="mov.tipoMovimiento === 'Entrada'" [class.badge-danger]="mov.tipoMovimiento === 'Salida'" [class.badge-neutral]="mov.tipoMovimiento === 'Ajuste'">
+                        {{ mov.tipoMovimiento }}
+                      </span>
+                    </td>
+                    <td><strong>{{ mov.cantidad }}</strong></td>
+                    <td>{{ mov.stockResultante }} unid.</td>
+                    <td>{{ mov.motivo }}</td>
+                    <td>{{ mov.proveedor || '-' }}</td>
+                    <td><small>{{ mov.usuarioResponsable }}</small></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      }
+
+      <!-- ============================================== -->
+      <!-- TAB 5: PROMOCIONES (RF19, RF20, RF21, RF24)    -->
+      <!-- ============================================== -->
+      @if (currentTab() === 'promotions') {
+        <section class="tab-panel">
+          <div class="panel-header">
+            <div>
+              <h1 class="panel-title">Módulo de Promociones y Descuentos</h1>
+              <p class="panel-subtitle">Descuentos porcentuales, valores fijos, vigencias y reglas automáticas</p>
+            </div>
+            <button class="btn btn-primary" (click)="openNewPromotionModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Crear Promoción
+            </button>
+          </div>
+
+          <div class="cards-grid">
+            @for (promo of adminService.promotions(); track promo.promocionId) {
+              <div class="entity-card promo-card">
+                <div class="entity-card-header">
+                  <div>
+                    <span class="promo-type-badge">{{ promo.tipo }}</span>
+                    <h3>{{ promo.nombre }}</h3>
+                  </div>
+                  <span class="status-indicator" [class.active]="promo.estado">{{ promo.estado ? 'Activa' : 'Inactiva' }}</span>
+                </div>
+                <div class="promo-discount-display">
+                  @if (promo.tipo === 'Porcentaje') {
+                    <span class="discount-value">{{ promo.valor }}% OFF</span>
+                  } @else {
+                    <span class="discount-value">{{ promo.valor | currency:'USD' }} OFF</span>
+                  }
+                  @if (promo.montoMinimo) {
+                    <span class="min-amount">Compra mín: {{ promo.montoMinimo | currency:'USD' }}</span>
+                  }
+                </div>
+                <p class="entity-card-desc">{{ promo.descripcion }}</p>
+                <div class="promo-validity">
+                  <small>📅 Vigencia: {{ promo.fechaInicio }} hasta {{ promo.fechaFin }}</small>
+                  <small>🎯 Aplica a: <strong>{{ promo.aplicaA }} {{ promo.referenciaNombre ? '(' + promo.referenciaNombre + ')' : '' }}</strong></small>
+                </div>
+                <div class="entity-card-footer">
+                  <button class="btn btn-sm" [class.btn-danger]="promo.estado" [class.btn-secondary]="!promo.estado" (click)="togglePromoState(promo)">
+                    {{ promo.estado ? 'Desactivar' : 'Activar' }}
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </section>
+      }
+
+      <!-- ============================================== -->
+      <!-- TAB 6: PROVEEDORES (RF11)                       -->
+      <!-- ============================================== -->
+      @if (currentTab() === 'suppliers') {
+        <section class="tab-panel">
+          <div class="panel-header">
+            <div>
+              <h1 class="panel-title">Módulo de Proveedores</h1>
+              <p class="panel-subtitle">Administración de empresas y distribuidores mayoristas autorizados</p>
+            </div>
+            <button class="btn btn-primary" (click)="openNewSupplierModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nuevo Proveedor
+            </button>
+          </div>
+
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>RUC / Identificación</th>
+                  <th>Razón Social</th>
+                  <th>Contacto</th>
+                  <th>Teléfono</th>
+                  <th>Correo</th>
+                  <th>Dirección</th>
+                  <th>Estado</th>
+                  <th class="text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (sup of adminService.suppliers(); track sup.proveedorId) {
+                  <tr>
+                    <td><code>{{ sup.identificacion }}</code></td>
+                    <td><strong>{{ sup.nombre }}</strong></td>
+                    <td>{{ sup.contacto || '-' }}</td>
+                    <td>{{ sup.telefono }}</td>
+                    <td>{{ sup.correo }}</td>
+                    <td><small>{{ sup.direccion }}</small></td>
+                    <td>
+                      <span class="status-indicator" [class.active]="sup.estado">{{ sup.estado ? 'Activo' : 'Inactivo' }}</span>
+                    </td>
+                    <td class="text-right">
+                      <button class="btn btn-sm" [class.btn-outline]="sup.estado" [class.btn-secondary]="!sup.estado" (click)="toggleSupState(sup)">
+                        {{ sup.estado ? 'Desactivar' : 'Activar' }}
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      }
+
+      <!-- ============================================== -->
+      <!-- TAB 7: CLIENTES (RF10, RF12)                    -->
+      <!-- ============================================== -->
+      @if (currentTab() === 'clients') {
+        <section class="tab-panel">
+          <div class="panel-header">
+            <div>
+              <h1 class="panel-title">Gestión de Clientes Registrados</h1>
+              <p class="panel-subtitle">Control de cuentas, historial de compras y estado de clientes</p>
+            </div>
+          </div>
+
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Identificación</th>
+                  <th>Cliente</th>
+                  <th>Correo Electrónico</th>
+                  <th>Teléfono</th>
+                  <th>Dirección</th>
+                  <th>Fecha Registro</th>
+                  <th>Total Compras</th>
+                  <th>Estado</th>
+                  <th class="text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (cli of filteredClients(); track cli.clienteId) {
+                  <tr>
+                    <td><code>{{ cli.identificacion }}</code></td>
+                    <td><strong>{{ cli.nombres }} {{ cli.apellidos }}</strong></td>
+                    <td>{{ cli.correo }}</td>
+                    <td>{{ cli.telefono }}</td>
+                    <td><small>{{ cli.direccion || 'Sin dirección registrada' }}</small></td>
+                    <td><small>{{ cli.fechaRegistro }}</small></td>
+                    <td><strong>{{ (cli.totalCompras || 0) | currency:'USD' }}</strong></td>
+                    <td>
+                      <span class="status-indicator" [class.active]="cli.estado">{{ cli.estado ? 'Activo' : 'Inactivo' }}</span>
+                    </td>
+                    <td class="text-right">
+                      <button class="btn btn-sm" [class.btn-danger]="cli.estado" [class.btn-secondary]="!cli.estado" (click)="toggleClient(cli.clienteId, cli.nombres, cli.estado)">
+                        {{ cli.estado ? 'Suspender' : 'Habilitar' }}
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      }
+
+      <!-- ============================================== -->
+      <!-- TAB 8: FACTURACIÓN (RF28, RF34, RF36, RF38)    -->
+      <!-- ============================================== -->
+      @if (currentTab() === 'billing') {
+        <section class="tab-panel">
+          <div class="panel-header">
+            <div>
+              <h1 class="panel-title">Módulo de Facturación Comercial</h1>
+              <p class="panel-subtitle">Historial de facturas emitidas, desglose de impuestos y valores comerciales</p>
+            </div>
+          </div>
+
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>N° Factura</th>
+                  <th>Fecha y Hora</th>
+                  <th>Cliente</th>
+                  <th>Cédula / RUC</th>
+                  <th>Subtotal</th>
+                  <th>Descuento</th>
+                  <th>IVA (15%)</th>
+                  <th>Total</th>
+                  <th>Estado</th>
+                  <th class="text-right">Detalle</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (inv of adminService.invoices(); track inv.facturaId) {
+                  <tr>
+                    <td><strong>{{ inv.numero }}</strong></td>
+                    <td><small>{{ inv.fecha }}</small></td>
+                    <td>{{ inv.clienteNombre }}</td>
+                    <td><code>{{ inv.clienteIdentificacion }}</code></td>
+                    <td>{{ inv.subtotal | currency:'USD' }}</td>
+                    <td class="text-success">-{{ inv.descuento | currency:'USD' }}</td>
+                    <td>{{ inv.impuesto | currency:'USD' }}</td>
+                    <td><strong class="total-highlight">{{ inv.total | currency:'USD' }}</strong></td>
+                    <td><span class="badge badge-success">{{ inv.estado }}</span></td>
+                    <td class="text-right">
+                      <button class="btn btn-sm btn-primary" (click)="viewInvoiceDetail(inv)">Ver Factura</button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      }
+
+    </main>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- MODAL: AGREGAR / EDITAR PRODUCTO (RF05, RF06)  -->
+  <!-- ============================================== -->
+  @if (showProductModal()) {
+    <div class="modal-backdrop" (click)="showProductModal.set(false)">
+      <div class="modal-dialog" (click)="$event.stopPropagation()">
+        <header class="modal-header">
+          <h2>{{ editingProduct() ? 'Editar Producto' : 'Registrar Nuevo Producto' }}</h2>
+          <button class="modal-close" (click)="showProductModal.set(false)">×</button>
+        </header>
+
+        <form [formGroup]="productForm" (ngSubmit)="saveProduct()">
+          <div class="modal-body">
+            <div class="form-row">
+              <div class="form-group">
+                <label>SKU / Código:</label>
+                <input type="text" formControlName="sku" placeholder="Ej: PRD-1029" />
+              </div>
+              <div class="form-group">
+                <label>Marca:</label>
+                <input type="text" formControlName="marca" placeholder="Ej: Apple, ASUS, Sony" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Nombre del Producto:</label>
+              <input type="text" formControlName="nombre" placeholder="Ej: Laptop ASUS VivoBook 15" />
+            </div>
+
+            <div class="form-group">
+              <label>Descripción detallada:</label>
+              <textarea rows="3" formControlName="descripcion" placeholder="Especificaciones técnicas y detalles..."></textarea>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Precio Unitario ($):</label>
+                <input type="number" step="0.01" formControlName="precio" placeholder="0.00" />
+              </div>
+              <div class="form-group">
+                <label>Categoría:</label>
+                <select formControlName="categoria">
+                  @for (cat of adminService.categories(); track cat.categoriaId) {
+                    <option [value]="cat.nombre">{{ cat.nombre }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Stock Inicial:</label>
+                <input type="number" formControlName="stock" />
+              </div>
+              <div class="form-group">
+                <label>Stock Mínimo (Alerta):</label>
+                <input type="number" formControlName="stockMinimo" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>URL de Imagen:</label>
+              <input type="text" formControlName="urlImagen" placeholder="https://..." />
+            </div>
+          </div>
+
+          <footer class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="showProductModal.set(false)">Cancelar</button>
+            <button type="submit" class="btn btn-primary" [disabled]="productForm.invalid">Guardar Producto</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- ============================================== -->
+  <!-- MODAL: REGISTRAR CATEGORÍA (RF08)              -->
+  <!-- ============================================== -->
+  @if (showCategoryModal()) {
+    <div class="modal-backdrop" (click)="showCategoryModal.set(false)">
+      <div class="modal-dialog modal-sm" (click)="$event.stopPropagation()">
+        <header class="modal-header">
+          <h2>{{ editingCategory() ? 'Editar Categoría' : 'Nueva Categoría' }}</h2>
+          <button class="modal-close" (click)="showCategoryModal.set(false)">×</button>
+        </header>
+
+        <form [formGroup]="categoryForm" (ngSubmit)="saveCategory()">
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Nombre de Categoría:</label>
+              <input type="text" formControlName="nombre" placeholder="Ej: Redes, Servidores..." />
+            </div>
+            <div class="form-group">
+              <label>Descripción:</label>
+              <textarea rows="3" formControlName="descripcion" placeholder="Breve descripción..."></textarea>
+            </div>
+          </div>
+          <footer class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="showCategoryModal.set(false)">Cancelar</button>
+            <button type="submit" class="btn btn-primary" [disabled]="categoryForm.invalid">Guardar</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- ============================================== -->
+  <!-- MODAL: MOVIMIENTO DE INVENTARIO (RF14)         -->
+  <!-- ============================================== -->
+  @if (showMovementModal()) {
+    <div class="modal-backdrop" (click)="showMovementModal.set(false)">
+      <div class="modal-dialog modal-sm" (click)="$event.stopPropagation()">
+        <header class="modal-header">
+          <h2>Registrar Movimiento de Inventario</h2>
+          <button class="modal-close" (click)="showMovementModal.set(false)">×</button>
+        </header>
+
+        <form [formGroup]="movementForm" (ngSubmit)="saveMovement()">
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Producto a afectar:</label>
+              <select formControlName="productoId">
+                @for (p of adminService.products(); track p.productoId) {
+                  <option [value]="p.productoId">{{ p.nombre }} (Stock actual: {{ p.stock }})</option>
+                }
+              </select>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Tipo de Operación:</label>
+                <select formControlName="tipoMovimiento">
+                  <option value="Entrada">Entrada (Compra / Ingreso)</option>
+                  <option value="Salida">Salida (Merma / Ajuste menor)</option>
+                  <option value="Ajuste">Ajuste Directo (Conteo físico)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Cantidad:</label>
+                <input type="number" formControlName="cantidad" min="1" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Proveedor (Opcional en compras):</label>
+              <select formControlName="proveedor">
+                <option value="">Ninguno / No aplica</option>
+                @for (sup of adminService.suppliers(); track sup.proveedorId) {
+                  <option [value]="sup.nombre">{{ sup.nombre }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Motivo:</label>
+              <input type="text" formControlName="motivo" placeholder="Ej: Compra según factura, auditoría..." />
+            </div>
+
+            <div class="form-group">
+              <label>Observaciones:</label>
+              <textarea rows="2" formControlName="observacion" placeholder="Detalles extra..."></textarea>
+            </div>
+          </div>
+          <footer class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="showMovementModal.set(false)">Cancelar</button>
+            <button type="submit" class="btn btn-primary" [disabled]="movementForm.invalid">Aplicar Movimiento</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- ============================================== -->
+  <!-- MODAL: CREAR PROMOCIÓN (RF19, RF26, RF27)      -->
+  <!-- ============================================== -->
+  @if (showPromotionModal()) {
+    <div class="modal-backdrop" (click)="showPromotionModal.set(false)">
+      <div class="modal-dialog" (click)="$event.stopPropagation()">
+        <header class="modal-header">
+          <h2>Configurar Nueva Promoción</h2>
+          <button class="modal-close" (click)="showPromotionModal.set(false)">×</button>
+        </header>
+
+        <form [formGroup]="promotionForm" (ngSubmit)="savePromotion()">
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Nombre de la Promoción:</label>
+              <input type="text" formControlName="nombre" placeholder="Ej: Rebaja Especial Cyber Days" />
+            </div>
+
+            <div class="form-group">
+              <label>Descripción:</label>
+              <textarea rows="2" formControlName="descripcion"></textarea>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Tipo de Descuento:</label>
+                <select formControlName="tipo">
+                  <option value="Porcentaje">Porcentual (%)</option>
+                  <option value="Monto Fijo">Monto Fijo ($)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Valor de Descuento:</label>
+                <input type="number" step="0.1" formControlName="valor" placeholder="Ej: 15 para 15% o $10" />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Monto Mínimo de Compra (Opcional):</label>
+                <input type="number" formControlName="montoMinimo" placeholder="Opcional ($)" />
+              </div>
+              <div class="form-group">
+                <label>Aplica a:</label>
+                <select formControlName="aplicaA">
+                  <option value="General">Toda la tienda (General)</option>
+                  <option value="Categoria">Por Categoría</option>
+                  <option value="Producto">Producto Específico</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Fecha de Inicio:</label>
+                <input type="date" formControlName="fechaInicio" />
+              </div>
+              <div class="form-group">
+                <label>Fecha de Finalización:</label>
+                <input type="date" formControlName="fechaFin" />
+              </div>
+            </div>
+          </div>
+          <footer class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="showPromotionModal.set(false)">Cancelar</button>
+            <button type="submit" class="btn btn-primary" [disabled]="promotionForm.invalid">Guardar Promoción</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- ============================================== -->
+  <!-- MODAL: NUEVO PROVEEDOR (RF11)                  -->
+  <!-- ============================================== -->
+  @if (showSupplierModal()) {
+    <div class="modal-backdrop" (click)="showSupplierModal.set(false)">
+      <div class="modal-dialog" (click)="$event.stopPropagation()">
+        <header class="modal-header">
+          <h2>Registrar Proveedor</h2>
+          <button class="modal-close" (click)="showSupplierModal.set(false)">×</button>
+        </header>
+
+        <form [formGroup]="supplierForm" (ngSubmit)="saveSupplier()">
+          <div class="modal-body">
+            <div class="form-row">
+              <div class="form-group">
+                <label>RUC o Identificación:</label>
+                <input type="text" formControlName="identificacion" placeholder="179..." />
+              </div>
+              <div class="form-group">
+                <label>Razón Social / Nombre:</label>
+                <input type="text" formControlName="nombre" placeholder="Nombre de empresa" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Teléfono:</label>
+                <input type="text" formControlName="telefono" />
+              </div>
+              <div class="form-group">
+                <label>Correo Electrónico:</label>
+                <input type="email" formControlName="correo" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Persona de Contacto:</label>
+              <input type="text" formControlName="contacto" />
+            </div>
+            <div class="form-group">
+              <label>Dirección:</label>
+              <input type="text" formControlName="direccion" />
+            </div>
+          </div>
+          <footer class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="showSupplierModal.set(false)">Cancelar</button>
+            <button type="submit" class="btn btn-primary" [disabled]="supplierForm.invalid">Guardar Proveedor</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- ============================================== -->
+  <!-- MODAL: DETALLE DE FACTURA (RF34, RF38)         -->
+  <!-- ============================================== -->
+  @if (selectedInvoice()) {
+    <div class="modal-backdrop" (click)="closeInvoiceDetail()">
+      <div class="modal-dialog modal-invoice" (click)="$event.stopPropagation()">
+        <header class="modal-header">
+          <div>
+            <h2>Factura Comercial {{ selectedInvoice()?.numero }}</h2>
+            <small>Emisión: {{ selectedInvoice()?.fecha }}</small>
+          </div>
+          <button class="modal-close" (click)="closeInvoiceDetail()">×</button>
+        </header>
+
+        <div class="modal-body">
+          <div class="invoice-meta-box">
+            <div>
+              <strong>Cliente:</strong> {{ selectedInvoice()?.clienteNombre }}
+            </div>
+            <div>
+              <strong>Identificación:</strong> {{ selectedInvoice()?.clienteIdentificacion }}
+            </div>
+            <div>
+              <strong>Estado:</strong> <span class="badge badge-success">{{ selectedInvoice()?.estado }}</span>
+            </div>
+          </div>
+
+          <table class="invoice-items-table">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Cant.</th>
+                <th>Precio Unit.</th>
+                <th>Desc.</th>
+                <th class="text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of selectedInvoice()?.detalles; track item.detalleId) {
+                <tr>
+                  <td><strong>{{ item.productoNombre }}</strong></td>
+                  <td>{{ item.cantidad }}</td>
+                  <td>{{ item.precioUnitario | currency:'USD' }}</td>
+                  <td>{{ item.descuentoPorcentual }}% ({{ item.descuentoValor | currency:'USD' }})</td>
+                  <td class="text-right"><strong>{{ item.total | currency:'USD' }}</strong></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+
+          <div class="invoice-summary-box">
+            <div class="summary-line">
+              <span>Subtotal:</span>
+              <strong>{{ selectedInvoice()?.subtotal | currency:'USD' }}</strong>
+            </div>
+            <div class="summary-line text-success">
+              <span>Descuento aplicado:</span>
+              <strong>-{{ selectedInvoice()?.descuento | currency:'USD' }}</strong>
+            </div>
+            <div class="summary-line">
+              <span>IVA (15%):</span>
+              <strong>{{ selectedInvoice()?.impuesto | currency:'USD' }}</strong>
+            </div>
+            <div class="summary-line grand-total">
+              <span>Total a Pagar:</span>
+              <span>{{ selectedInvoice()?.total | currency:'USD' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <footer class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closeInvoiceDetail()">Cerrar</button>
+        </footer>
+      </div>
+    </div>
+  }
+
+  <!-- ============================================== -->
+  <!-- MODAL: BLOQUEAR / CANCELAR PEDIDO             -->
+  <!-- ============================================== -->
+  @if (showBlockOrderModal()) {
+    <div class="modal-backdrop" (click)="showBlockOrderModal.set(false)">
+      <div class="modal-dialog modal-sm" (click)="$event.stopPropagation()">
+        <header class="modal-header">
+          <div>
+            <h2 class="text-danger">{{ blockActionType() === 'Bloqueado' ? 'Bloquear Pedido' : 'Cancelar Pedido' }} {{ orderToBlock()?.numero }}</h2>
+            <small>Cliente: {{ orderToBlock()?.clienteNombre }} ({{ orderToBlock()?.clienteEmail }})</small>
+          </div>
+          <button class="modal-close" (click)="showBlockOrderModal.set(false)">×</button>
+        </header>
+
+        <div class="modal-body">
+          <div class="alert-block-info">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px;color:#dc2626;flex-shrink:0;">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <div>
+              <strong>Aviso de seguridad:</strong>
+              <p style="margin:4px 0 0;font-size:0.84rem;color:#475569;">
+                Esta acción marcará el pedido como <strong>{{ blockActionType() }}</strong> y registrará una notificación formal de aviso para el cliente con el motivo especificado.
+              </p>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Motivo de la acción (Se enviará al cliente):</label>
+            <textarea rows="3" [formControl]="blockReasonControl" placeholder="Describe claramente el motivo o problema con el pedido..."></textarea>
+            @if (blockReasonControl.invalid && blockReasonControl.touched) {
+              <small class="text-danger">Debes ingresar un motivo de al menos 4 caracteres.</small>
+            }
+          </div>
+        </div>
+
+        <footer class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="showBlockOrderModal.set(false)">Descartar</button>
+          <button type="button" class="btn btn-danger" [disabled]="blockReasonControl.invalid" (click)="confirmBlockOrCancel()">
+            Confirmar y Notificar al Cliente
+          </button>
+        </footer>
+      </div>
+    </div>
+  }
+
+  <!-- ============================================== -->
+  <!-- MODAL: DETALLE DEL PEDIDO                     -->
+  <!-- ============================================== -->
+  @if (selectedOrderDetail()) {
+    <div class="modal-backdrop" (click)="closeOrderDetail()">
+      <div class="modal-dialog modal-invoice" (click)="$event.stopPropagation()">
+        <header class="modal-header">
+          <div>
+            <h2>Pedido {{ selectedOrderDetail()?.numero }}</h2>
+            <small>Fecha: {{ selectedOrderDetail()?.fecha }}</small>
+          </div>
+          <button class="modal-close" (click)="closeOrderDetail()">×</button>
+        </header>
+
+        <div class="modal-body">
+          <div class="invoice-meta-box">
+            <div>
+              <strong>Cliente:</strong> {{ selectedOrderDetail()?.clienteNombre }}
+              <div><small>{{ selectedOrderDetail()?.clienteEmail }}</small></div>
+            </div>
+            <div>
+              <strong>Identificación:</strong> {{ selectedOrderDetail()?.clienteIdentificacion }}
+            </div>
+            <div>
+              <strong>Estado:</strong>
+              <span class="badge"
+                [class.badge-warning]="selectedOrderDetail()?.estado === 'Pendiente' || selectedOrderDetail()?.estado === 'Procesando'"
+                [class.badge-success]="selectedOrderDetail()?.estado === 'Enviado' || selectedOrderDetail()?.estado === 'Entregado'"
+                [class.badge-danger]="selectedOrderDetail()?.estado === 'Cancelado' || selectedOrderDetail()?.estado === 'Bloqueado'">
+                {{ selectedOrderDetail()?.estado }}
+              </span>
+            </div>
+          </div>
+
+          <div class="order-delivery-address" style="margin-top:10px;padding:10px 14px;background:#f1f5f9;border-radius:8px;font-size:0.88rem;">
+            <strong>📍 Dirección de entrega:</strong> {{ selectedOrderDetail()?.direccion }}
+          </div>
+
+          @if (selectedOrderDetail()?.motivoBloqueo) {
+            <div class="order-alert-box" style="margin-top:10px;padding:12px;background:#fee2e2;border-radius:8px;color:#991b1b;font-size:0.88rem;">
+              <strong>⚠️ Observación administrativa:</strong> {{ selectedOrderDetail()?.motivoBloqueo }}
+            </div>
+          }
+
+          <table class="invoice-items-table" style="margin-top:16px;">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Precio Unitario</th>
+                <th class="text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of selectedOrderDetail()?.items; track item.productoNombre) {
+                <tr>
+                  <td><strong>{{ item.productoNombre }}</strong></td>
+                  <td>{{ item.cantidad }} unidad(es)</td>
+                  <td>{{ item.precioUnitario | currency:'USD' }}</td>
+                  <td class="text-right"><strong>{{ item.total | currency:'USD' }}</strong></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+
+          <div class="invoice-summary-box">
+            <div class="summary-line grand-total">
+              <span>Total del Pedido:</span>
+              <span>{{ selectedOrderDetail()?.total | currency:'USD' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <footer class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closeOrderDetail()">Cerrar</button>
+        </footer>
+      </div>
+    </div>
+  }
+
+</div>

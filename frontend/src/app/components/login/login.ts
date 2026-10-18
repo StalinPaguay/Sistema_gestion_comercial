@@ -59,6 +59,12 @@ export class Login implements OnInit {
     this.authService.login(credentials, formValue.remember).subscribe({
       next: () => {
         this.isSubmitting.set(false);
+        const user = this.authService.currentUser();
+        if (user && user.Rol === 'Administrador') {
+          void this.router.navigateByUrl('/admin');
+          return;
+        }
+
         const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
         const destination = returnUrl?.startsWith('/') && !returnUrl.startsWith('//')
           ? returnUrl

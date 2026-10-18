@@ -14,6 +14,17 @@
     </div>
   </header>
 
+  @for (notif of clientNotifications(); track notif.notificacionId) {
+    <div class="feedback error order-cancellation-banner" role="alert" style="display: flex; justify-content: space-between; align-items: flex-start; padding: 14px 18px; border-radius: 8px; margin-bottom: 16px; background-color: #fee2e2; border: 1px solid #fecaca; color: #991b1b;">
+      <div>
+        <strong style="font-size: 0.95rem;">⚠️ Aviso importante sobre tu Pedido #{{ notif.pedidoId }}:</strong>
+        <p style="margin: 4px 0 0 0; font-size: 0.88rem;">Tu pedido ha sido marcado como <strong>{{ notif.estado }}</strong> por el equipo administrativo de TECNOMEGA.</p>
+        <p style="margin: 6px 0 0 0; font-size: 0.84rem; background: rgba(255,255,255,0.7); padding: 4px 8px; border-radius: 4px; display: inline-block;"><strong>Motivo:</strong> {{ notif.motivo }}</p>
+      </div>
+      <button type="button" (click)="dismissNotification(notif.notificacionId)" style="background: none; border: none; font-size: 1.3rem; cursor: pointer; color: #991b1b; line-height: 1;">×</button>
+    </div>
+  }
+
   @if (confirmationMessage()) {
     <p class="feedback success" role="status">{{ confirmationMessage() }}</p>
   }

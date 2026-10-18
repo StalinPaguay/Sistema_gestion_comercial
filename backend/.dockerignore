@@ -1,0 +1,26 @@
+# Entornos virtuales locales
+venv/
+.venv/
+
+# Caché y archivos compilados de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Variables de entorno y credenciales
+.env
+.env.*
+!.env.example
+
+# Herramientas de desarrollo y pruebas locales
+.pytest_cache/
+.mypy_cache/
+.vscode/
+.idea/
+
+# Archivos temporales y copias de seguridad
+*.tmp
+*.temp
+*.bak
+*.backup
+*.swp

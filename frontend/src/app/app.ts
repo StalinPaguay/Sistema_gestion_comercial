@@ -29,6 +29,6 @@ export class App {
 
   private isAuthRoute(url: string): boolean {
     const path = url.split(/[?#]/, 1)[0].replace(/\/+$/, '') || '/';
-    return path === '/login' || path === '/register';
+    return path === '/login' || path === '/register' || path === '/admin' || path.startsWith('/admin/');
   }
 }
