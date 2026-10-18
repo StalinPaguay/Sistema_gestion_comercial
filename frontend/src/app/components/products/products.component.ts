@@ -213,6 +213,76 @@ export class ProductsComponent implements OnInit, OnDestroy {
     });
   }
 
+  get filteredPromotions(): Promotion[] {
+    const term = this.searchTerm.trim().toLocaleLowerCase();
+    const selectedCat = this.selectedCategory?.trim().toLocaleLowerCase();
+    const selectedCats = this.selectedCategories.map((c) => c.trim().toLocaleLowerCase());
+    const hasCategoryFilter = Boolean(selectedCat) || selectedCats.length > 0;
+    const activeCategoryFilters = selectedCats.length > 0 ? selectedCats : (selectedCat ? [selectedCat] : []);
+
+    return this.promotions.filter((promotion) => {
+      if (!promotion.Estado) {
+        return false;
+      }
+
+      const hasProductIds = Array.isArray(promotion.ProductosIds) && promotion.ProductosIds.length > 0;
+      const hasCategoryIds = Array.isArray(promotion.CategoriasIds) && promotion.CategoriasIds.length > 0;
+
+      const promoProducts = this.products.filter((p) =>
+        promotion.ProductosIds?.includes(p.productoId)
+      );
+
+      const promoCategoryNames = this.categories
+        .filter((c) => promotion.CategoriasIds?.includes(c.id_categoria))
+        .map((c) => c.nombre.toLocaleLowerCase());
+
+      const promoCategoryProducts = this.products.filter((p) =>
+        promoCategoryNames.includes(p.categoria.toLocaleLowerCase())
+      );
+
+      const relevantProducts = hasProductIds
+        ? promoProducts
+        : (hasCategoryIds ? promoCategoryProducts : this.products);
+
+      if (hasCategoryFilter) {
+        const matchesCategory =
+          relevantProducts.some((p) => activeCategoryFilters.includes(p.categoria.toLocaleLowerCase())) ||
+          promoCategoryNames.some((cName) => activeCategoryFilters.includes(cName));
+
+        if (!matchesCategory) {
+          return false;
+        }
+      }
+
+      if (term) {
+        const matchesPromoDirectly =
+          promotion.Nombre.toLocaleLowerCase().includes(term) ||
+          (promotion.CodigoCupon ? promotion.CodigoCupon.toLocaleLowerCase().includes(term) : false);
+
+        if (matchesPromoDirectly) {
+          return true;
+        }
+
+        const matchesCategoryName = promoCategoryNames.some((cName) => cName.includes(term));
+        if (matchesCategoryName) {
+          return true;
+        }
+
+        const matchesAnyProduct = relevantProducts.some(
+          (p) =>
+            p.nombre.toLocaleLowerCase().includes(term) ||
+            p.descripcion.toLocaleLowerCase().includes(term) ||
+            p.categoria.toLocaleLowerCase().includes(term) ||
+            p.sku.toLocaleLowerCase().includes(term)
+        );
+
+        return matchesAnyProduct;
+      }
+
+      return true;
+    });
+  }
+
   formatPromotionValue(promotion: Promotion): string {
     const value = Number(promotion.ValorDescuento);
     if (!Number.isFinite(value)) {
@@ -334,7 +404,12 @@ export class ProductsComponent implements OnInit, OnDestroy {
   }
 
   addToCart(product: Product): void {
-    if (product.stock <= 0 || this.cartAdding) {
+    if (this.cartAdding) {
+      return;
+    }
+
+    if (product.stock <= 0) {
+      this.showCartNotice(`No hay stock disponible para "${product.nombre}".`, true);
       return;
     }
 

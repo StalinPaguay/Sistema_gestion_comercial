@@ -35,18 +35,25 @@ export class Cart implements OnInit {
   private readonly orderService = inject(OrderService);
   private readonly router = inject(Router);
   private readonly promotionService = inject(PromotionService);
-  @ViewChild('cardDemoForm') private cardDemoForm?: ElementRef<HTMLFormElement>;
+  @ViewChild('cardForm') private cardForm?: ElementRef<HTMLFormElement>;
   protected recommendedProducts: Product[] = [];
   protected feedback = '';
   protected readonly addresses = signal<DeliveryAddress[]>([]);
   protected readonly paymentMethods = signal<PaymentMethod[]>([]);
   protected readonly selectedAddressId = signal<number | null>(null);
   protected readonly selectedPaymentMethodId = signal<number | null>(null);
-  protected readonly transferDemoQr = signal('');
-  protected readonly transferDemoQrLoading = signal(false);
-  protected readonly cardDemoValid = signal(false);
-  protected readonly cardDemoSubmitted = signal(false);
-  protected readonly cardDemoErrors = signal<string[]>([]);
+  protected readonly transferQr = signal('');
+  protected readonly transferQrLoading = signal(false);
+  protected readonly cardValid = signal(false);
+  protected readonly cardSubmitted = signal(false);
+  protected readonly cardErrors = signal<string[]>([]);
+
+  // Compatibilidad con getters
+  get transferDemoQr() { return this.transferQr; }
+  get transferDemoQrLoading() { return this.transferQrLoading; }
+  get cardDemoValid() { return this.cardValid; }
+  get cardDemoSubmitted() { return this.cardSubmitted; }
+  get cardDemoErrors() { return this.cardErrors; }
   protected readonly checkoutDetailsOpen = signal(false);
   protected readonly addressFormOpen = signal(false);
   protected readonly checkoutLoading = signal(false);
@@ -249,7 +256,7 @@ export class Cart implements OnInit {
             null,
         );
         this.selectedPaymentMethodId.set(methods[0]?.MetodoPagoId ?? null);
-        this.updateTransferDemoQr();
+        this.updateTransferQr();
         this.addressFormOpen.set(addresses.length === 0);
         this.checkoutDetailsOpen.set(true);
         if (!methods.length) this.feedback = 'No hay métodos de pago activos configurados.';
@@ -273,10 +280,10 @@ export class Cart implements OnInit {
     const select = event.target;
     if (select instanceof HTMLSelectElement) {
       this.selectedPaymentMethodId.set(Number(select.value) || null);
-      this.cardDemoValid.set(false);
-      this.cardDemoSubmitted.set(false);
-      this.cardDemoErrors.set([]);
-      this.updateTransferDemoQr();
+      this.cardValid.set(false);
+      this.cardSubmitted.set(false);
+      this.cardErrors.set([]);
+      this.updateTransferQr();
     }
   }
 
@@ -286,76 +293,131 @@ export class Cart implements OnInit {
       ?.Nombre.toLocaleLowerCase().includes('tarjeta') ?? false;
   }
 
-  protected validateDemoCard(event: Event): void {
+  protected validateCard(event: Event): void {
     const input = event.target;
     const form = input instanceof HTMLInputElement ? input.closest('form') : null;
-    this.cardDemoSubmitted.set(true);
-    this.updateCardDemoValidation(form ?? undefined);
+    this.cardSubmitted.set(true);
+    this.updateCardValidation(form ?? undefined);
   }
 
-  protected formatDemoCardExpiry(event: Event): void {
+  protected formatCardNumber(event: Event): void {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) return;
 
-    const cursor = input.selectionStart ?? input.value.length;
-    const digitsBeforeCursor = input.value.slice(0, cursor).replace(/\D/g, '').length;
-    const digits = input.value.replace(/\D/g, '').slice(0, 4);
-    input.value = digits.length >= 2
-      ? `${digits.slice(0, 2)}/${digits.slice(2)}`
-      : digits;
-
-    const formattedCursor = digitsBeforeCursor + (digitsBeforeCursor >= 2 && digits.length >= 2 ? 1 : 0);
-    input.setSelectionRange(formattedCursor, formattedCursor);
+    const digits = input.value.replace(/\D/g, '').slice(0, 16);
+    const groups = digits.match(/.{1,4}/g);
+    input.value = groups ? groups.join(' ') : digits;
+    this.updateCardValidation(input.closest('form') ?? undefined);
   }
 
-  private updateCardDemoValidation(form?: HTMLFormElement): boolean {
-    const formElement = form ?? this.cardDemoForm?.nativeElement;
+  protected formatCardExpiry(event: Event): void {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+
+    const digits = input.value.replace(/\D/g, '').slice(0, 4);
+    if (digits.length >= 3) {
+      input.value = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    } else if (digits.length === 2 && input.value.length === 2) {
+      input.value = `${digits}/`;
+    } else {
+      input.value = digits;
+    }
+    this.updateCardValidation(input.closest('form') ?? undefined);
+  }
+
+  protected formatCardCvv(event: Event): void {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    input.value = input.value.replace(/\D/g, '').slice(0, 4);
+    this.updateCardValidation(input.closest('form') ?? undefined);
+  }
+
+  private updateCardValidation(form?: HTMLFormElement): boolean {
+    const formElement = form ?? this.cardForm?.nativeElement;
     if (!formElement) {
-      this.cardDemoErrors.set(['los campos de tarjeta']);
-      this.cardDemoValid.set(false);
+      this.cardErrors.set(['los campos de la tarjeta']);
+      this.cardValid.set(false);
       return false;
     }
 
-    const invalidFields = Array.from(formElement.querySelectorAll<HTMLInputElement>(':invalid'));
-    this.cardDemoErrors.set(
-      invalidFields.map((field) => field.closest('label')?.textContent?.trim().replace(/\s+/g, ' ') ?? 'Un campo'),
-    );
-    const valid = formElement.checkValidity();
-    this.cardDemoValid.set(valid);
+    const errors: string[] = [];
+    const inputs = Array.from(formElement.querySelectorAll<HTMLInputElement>('input'));
+    const titularInput = inputs[0];
+    const numeroInput = inputs[1];
+    const vencimientoInput = inputs[2];
+    const cvvInput = inputs[3];
+
+    // 1. Titular
+    if (!titularInput || titularInput.value.trim().length < 3) {
+      errors.push('Titular de la tarjeta (mínimo 3 letras)');
+    }
+
+    // 2. Estándar de 16 dígitos de tarjeta
+    const digitsCard = (numeroInput?.value || '').replace(/\D/g, '');
+    if (digitsCard.length !== 16) {
+      errors.push(`Número de tarjeta (${digitsCard.length}/16 dígitos ingresados)`);
+    }
+
+    // 3. Vencimiento MM/AA
+    const expVal = vencimientoInput?.value || '';
+    const expMatch = expVal.match(/^(0[1-9]|1[0-2])\/(\d{2})$/);
+    if (!expMatch) {
+      errors.push('Fecha de vencimiento (formato MM/AA)');
+    } else {
+      const month = parseInt(expMatch[1], 10);
+      const year = parseInt(`20${expMatch[2]}`, 10);
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+      if (year < currentYear || (year === currentYear && month < currentMonth)) {
+        errors.push('Fecha de vencimiento expirada');
+      }
+    }
+
+    // 4. CVV (3 o 4 dígitos)
+    const cvvVal = (cvvInput?.value || '').replace(/\D/g, '');
+    if (cvvVal.length < 3 || cvvVal.length > 4) {
+      errors.push('Código de seguridad CVV (3 o 4 dígitos)');
+    }
+
+    this.cardErrors.set(errors);
+    const valid = errors.length === 0;
+    this.cardValid.set(valid);
     if (valid && this.feedback === 'Revisa los campos de tarjeta marcados antes de continuar.') {
       this.feedback = '';
     }
     return valid;
   }
 
-  private updateTransferDemoQr(): void {
+  private updateTransferQr(): void {
     const generation = ++this.transferQrGeneration;
     const selectedMethod = this.paymentMethods().find(
       (method) => method.MetodoPagoId === this.selectedPaymentMethodId(),
     );
     if (!selectedMethod?.Nombre.toLocaleLowerCase().includes('transferencia')) {
-      this.transferDemoQr.set('');
-      this.transferDemoQrLoading.set(false);
+      this.transferQr.set('');
+      this.transferQrLoading.set(false);
       return;
     }
 
-    this.transferDemoQrLoading.set(true);
-    void QRCode.toDataURL('TECNOMEGA-DEMO|TRANSFERENCIA|NO_PAGO', {
+    this.transferQrLoading.set(true);
+    const qrData = `TECNOMEGA|BANCO_PICHINCHA|CTA_CTE_2200192837|RUC_1792283918001|MONTO_${this.totalAfterDiscount()}`;
+    void QRCode.toDataURL(qrData, {
       errorCorrectionLevel: 'M',
       margin: 2,
       width: 220,
     })
       .then((qr) => {
-        if (generation === this.transferQrGeneration) this.transferDemoQr.set(qr);
+        if (generation === this.transferQrGeneration) this.transferQr.set(qr);
       })
       .catch(() => {
         if (generation === this.transferQrGeneration) {
-          this.transferDemoQr.set('');
-          this.feedback = 'No se pudo generar el QR de demostración.';
+          this.transferQr.set('');
+          this.feedback = 'No se pudo generar el código QR de transferencia.';
         }
       })
       .finally(() => {
-        if (generation === this.transferQrGeneration) this.transferDemoQrLoading.set(false);
+        if (generation === this.transferQrGeneration) this.transferQrLoading.set(false);
       });
   }
 
@@ -422,9 +484,9 @@ export class Cart implements OnInit {
       return;
     }
     if (this.isCardPaymentSelected()) {
-      this.cardDemoSubmitted.set(true);
-      if (!this.updateCardDemoValidation()) {
-        this.feedback = 'Revisa los campos de tarjeta marcados antes de continuar.';
+      this.cardSubmitted.set(true);
+      if (!this.updateCardValidation()) {
+        this.feedback = 'Revisa los datos de la tarjeta antes de continuar.';
         return;
       }
     }
@@ -441,9 +503,9 @@ export class Cart implements OnInit {
     this.orderSubmitting.set(true);
     this.orderService.createOrder(request).subscribe({
       next: (order) => {
-        this.cardDemoValid.set(false);
-        this.cardDemoSubmitted.set(false);
-        this.cardDemoErrors.set([]);
+        this.cardValid.set(false);
+        this.cardSubmitted.set(false);
+        this.cardErrors.set([]);
         this.appliedCoupon.set(null);
         this.cartService.clear();
         this.orderSubmitting.set(false);

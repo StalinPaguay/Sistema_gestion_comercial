@@ -554,6 +554,15 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.selectedInvoice.set(inv);
   }
 
+  printInvoice(inv?: AdminInvoice): void {
+    if (inv) {
+      this.selectedInvoice.set(inv);
+    }
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  }
+
   closeInvoiceDetail(): void {
     this.selectedInvoice.set(null);
   }

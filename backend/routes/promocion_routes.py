@@ -131,7 +131,7 @@ def listar_promociones(
     if not incluir_inactivas:
         now = datetime.now()
         query = query.filter(
-            Promocion.Estado.is_(True),
+            Promocion.Estado == True,
             Promocion.FechaInicio <= now,
             Promocion.FechaFin >= now,
         )
@@ -462,7 +462,7 @@ def validar_cupon(
         db.query(Promocion)
         .filter(
             Promocion.CodigoCupon == codigo,
-            Promocion.Estado.is_(True),
+            Promocion.Estado == True,
         )
         .first()
     )

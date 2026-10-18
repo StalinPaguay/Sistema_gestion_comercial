@@ -415,6 +415,16 @@
   background-color: #fecaca;
 }
 
+.btn-success {
+  background-color: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.btn-success:hover {
+  background-color: #bbf7d0;
+}
+
 .btn-sm {
   padding: 6px 12px;
   font-size: 0.8rem;
@@ -1298,4 +1308,49 @@
 
 .dark-theme .min-amount {
   color: #1e293b;
+}
+
+@media print {
+  body, html {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .admin-sidebar,
+  .admin-navbar,
+  .panel-header,
+  .table-toolbar,
+  .admin-main > header,
+  .modal-header button,
+  .modal-footer,
+  .alert-banner {
+    display: none !important;
+  }
+
+  .admin-layout,
+  .admin-main {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .modal-backdrop {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+  }
+
+  .modal-dialog.modal-invoice {
+    border: 1px solid #94a3b8 !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 24px !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
 }

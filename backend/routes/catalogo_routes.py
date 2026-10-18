@@ -462,7 +462,10 @@ def listar_productos(
     consulta = db.query(Producto)
 
     if not incluir_inactivos:
-        consulta = consulta.filter(Producto.Estado == True)  # noqa: E712
+        consulta = consulta.join(Categoria).filter(
+            Producto.Estado == True,  # noqa: E712
+            Categoria.Estado == True,  # noqa: E712
+        )
 
     total = consulta.count()
 

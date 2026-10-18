@@ -278,14 +278,34 @@ export class AdminService {
 
   refreshAllData(): void {
     this.fetchProductsFromApi();
+    this.fetchCategoriesFromApi();
     this.fetchClientsFromApi();
     this.fetchOrdersFromApi();
     this.fetchInvoicesFromApi();
     this.fetchPromotionsFromApi();
   }
 
+  fetchCategoriesFromApi(): void {
+    this.http
+      .get<any>(`${API_BASE_URL}/categorias?incluir_inactivas=true&limite=100`, { headers: this.getAuthHeaders() })
+      .pipe(catchError(() => of({ categorias: [] })))
+      .subscribe((res) => {
+        if (res && Array.isArray(res.categorias) && res.categorias.length > 0) {
+          const apiCats: AdminCategory[] = res.categorias.map((c: any) => ({
+            categoriaId: c.CategoriaId,
+            nombre: c.Nombre,
+            descripcion: c.Descripcion || '',
+            estado: c.Estado !== false,
+          }));
+          this.categories.set(apiCats);
+          this.saveToStorage('admin_categories', apiCats);
+          this.recalculateStats();
+        }
+      });
+  }
+
   fetchProductsFromApi(): void {
-    this.http.get<any>(`${API_BASE_URL}/productos?limite=100`, { headers: this.getAuthHeaders() })
+    this.http.get<any>(`${API_BASE_URL}/productos?incluir_inactivos=true&limite=100`, { headers: this.getAuthHeaders() })
       .pipe(
         catchError(() => of({ productos: [] }))
       )
@@ -375,19 +395,34 @@ export class AdminService {
             }));
         }
 
+        const currentClients = this.clients();
+        const localStatusMap = new Map(currentClients.map((c) => [c.clienteId, c.estado]));
+
         const defaultClients = this.getDefaultClients();
         const apiEmails = new Set(apiClients.map((c) => (c.correo || '').toLowerCase()));
         const apiIds = new Set(apiClients.map((c) => c.identificacion));
 
-        const preservedDefaults = defaultClients.filter(
-          (d) =>
-            !apiEmails.has((d.correo || '').toLowerCase()) &&
-            !apiIds.has(d.identificacion) &&
-            (d.correo || '').toLowerCase() !== currentAdminEmail &&
-            !(d.correo || '').toLowerCase().includes('admin@')
-        );
+        const preservedDefaults = defaultClients
+          .filter(
+            (d) =>
+              !apiEmails.has((d.correo || '').toLowerCase()) &&
+              !apiIds.has(d.identificacion) &&
+              (d.correo || '').toLowerCase() !== currentAdminEmail &&
+              !(d.correo || '').toLowerCase().includes('admin@')
+          )
+          .map((d) => {
+            const localEstado = localStatusMap.get(d.clienteId);
+            return localEstado !== undefined ? { ...d, estado: localEstado } : d;
+          });
 
-        const combined = [...apiClients, ...preservedDefaults];
+        const combined = [
+          ...apiClients.map((c) => {
+            const localEstado = localStatusMap.get(c.clienteId);
+            // Si el estado local es diferente y aún se está sincronizando, o el de la API
+            return localEstado !== undefined ? { ...c, estado: localEstado } : c;
+          }),
+          ...preservedDefaults,
+        ];
         this.clients.set(combined);
         this.saveToStorage('admin_clients', combined);
         this.recalculateStats();
@@ -466,31 +501,32 @@ export class AdminService {
         let apiInvoices: AdminInvoice[] = [];
         if (res && Array.isArray(res.facturas) && res.facturas.length > 0) {
           apiInvoices = res.facturas.map((f: any) => {
-            const detalles = Array.isArray(f.detalles)
-              ? f.detalles.map((d: any) => ({
-                  detalleId: d.DetalleFacturaId,
-                  productoId: d.ProductoId,
-                  productoNombre: d.Nombre || 'Producto',
-                  cantidad: d.Cantidad,
-                  precioUnitario: Number(d.PrecioUnitario || 0),
-                  descuentoPorcentual: Number(d.DescuentoPorcentaje || 0),
-                  descuentoValor: Number(d.DescuentoMonto || 0),
-                  subtotal: Number(d.Subtotal || 0),
-                  total: Number(d.Total || 0),
-                }))
-              : [];
+            const rawItems = Array.isArray(f.Items) ? f.Items : (Array.isArray(f.detalles) ? f.detalles : []);
+            const detalles = rawItems.map((d: any) => ({
+              detalleId: d.DetalleFacturaId || d.detalleId || d.ProductoId,
+              productoId: d.ProductoId || d.productoId,
+              productoNombre: d.Nombre || d.productoNombre || 'Producto',
+              cantidad: Number(d.Cantidad || d.cantidad || 1),
+              precioUnitario: Number(d.PrecioUnitario ?? d.precioUnitario ?? 0),
+              descuentoPorcentual: Number(d.DescuentoPorcentaje ?? d.descuentoPorcentual ?? 0),
+              descuentoValor: Number(d.DescuentoValor ?? d.descuentoValor ?? d.DescuentoMonto ?? 0),
+              subtotal: Number(d.Subtotal ?? d.subtotal ?? 0),
+              total: Number(d.Total ?? d.total ?? 0),
+            }));
+
+            const fechaRaw = f.Fecha || f.FechaEmision;
 
             return {
               facturaId: f.FacturaId,
-              numero: f.NumeroFactura || `FAC-${String(f.FacturaId).padStart(6, '0')}`,
+              numero: f.Numero || f.NumeroFactura || `FAC-${String(f.FacturaId).padStart(6, '0')}`,
               clienteNombre: f.Cliente
                 ? `${f.Cliente.Nombres || ''} ${f.Cliente.Apellidos || ''}`.trim()
-                : 'Cliente',
-              clienteIdentificacion: f.Cliente?.Identificacion || 'S/I',
-              fecha: f.FechaEmision ? new Date(f.FechaEmision).toLocaleString() : new Date().toLocaleString(),
+                : (f.clienteNombre || 'Cliente Registrado'),
+              clienteIdentificacion: f.Cliente?.Identificacion || f.clienteIdentificacion || 'S/I',
+              fecha: fechaRaw ? new Date(fechaRaw).toLocaleString() : new Date().toLocaleString(),
               subtotal: Number(f.Subtotal || 0),
-              descuento: Number(f.DescuentoTotal || 0),
-              impuesto: Number(f.IVA || 0),
+              descuento: Number(f.Descuento ?? f.DescuentoTotal ?? 0),
+              impuesto: Number(f.Impuesto ?? f.IVA ?? 0),
               total: Number(f.Total || 0),
               estado: f.Estado || 'Emitida',
               detalles,
@@ -572,10 +608,19 @@ export class AdminService {
   }
 
   toggleProductStatus(id: number): void {
-    const updated = this.products().map((p) => (p.productoId === id ? { ...p, estado: !p.estado } : p));
+    const prod = this.products().find((p) => p.productoId === id);
+    if (!prod) return;
+    const nuevoEstado = !prod.estado;
+
+    const updated = this.products().map((p) => (p.productoId === id ? { ...p, estado: nuevoEstado } : p));
     this.products.set(updated);
     this.saveToStorage('admin_products', updated);
     this.recalculateStats();
+
+    this.http
+      .patch(`${API_BASE_URL}/productos/${id}`, { Estado: nuevoEstado }, { headers: this.getAuthHeaders() })
+      .pipe(catchError(() => of(null)))
+      .subscribe();
   }
 
   deleteProduct(id: number): void {
@@ -602,12 +647,35 @@ export class AdminService {
     const updated = this.categories().map((c) => (c.categoriaId === id ? { ...c, ...changes } : c));
     this.categories.set(updated);
     this.saveToStorage('admin_categories', updated);
+    this.recalculateStats();
+
+    const payload: any = {};
+    if (changes.nombre !== undefined) payload.Nombre = changes.nombre;
+    if (changes.descripcion !== undefined) payload.Descripcion = changes.descripcion;
+    if (changes.estado !== undefined) payload.Estado = changes.estado;
+
+    if (Object.keys(payload).length > 0) {
+      this.http
+        .patch(`${API_BASE_URL}/categorias/${id}`, payload, { headers: this.getAuthHeaders() })
+        .pipe(catchError(() => of(null)))
+        .subscribe();
+    }
   }
 
   toggleCategoryStatus(id: number): void {
-    const updated = this.categories().map((c) => (c.categoriaId === id ? { ...c, estado: !c.estado } : c));
+    const cat = this.categories().find((c) => c.categoriaId === id);
+    if (!cat) return;
+    const nuevoEstado = !cat.estado;
+
+    const updated = this.categories().map((c) => (c.categoriaId === id ? { ...c, estado: nuevoEstado } : c));
     this.categories.set(updated);
     this.saveToStorage('admin_categories', updated);
+    this.recalculateStats();
+
+    this.http
+      .patch(`${API_BASE_URL}/categorias/${id}`, { Estado: nuevoEstado }, { headers: this.getAuthHeaders() })
+      .pipe(catchError(() => of(null)))
+      .subscribe();
   }
 
   // ==========================================
@@ -675,10 +743,21 @@ export class AdminService {
   // CLIENTES (RF10, RF12)
   // ==========================================
   toggleClientStatus(clienteId: number): void {
-    const updated = this.clients().map((c) => (c.clienteId === clienteId ? { ...c, estado: !c.estado } : c));
+    const current = this.clients();
+    const target = current.find((c) => c.clienteId === clienteId);
+    if (!target) return;
+    const nuevoEstado = !target.estado;
+
+    const updated = current.map((c) => (c.clienteId === clienteId ? { ...c, estado: nuevoEstado } : c));
     this.clients.set(updated);
     this.saveToStorage('admin_clients', updated);
     this.recalculateStats();
+
+    // Persistir el cambio de estado en el backend para que no se reactive al recargar
+    this.http
+      .patch(`${API_BASE_URL}/clientes/${clienteId}`, { Estado: nuevoEstado }, { headers: this.getAuthHeaders() })
+      .pipe(catchError(() => of(null)))
+      .subscribe();
   }
 
   // ==========================================
@@ -850,7 +929,10 @@ export class AdminService {
         { headers: this.getAuthHeaders() }
       )
       .pipe(catchError(() => of(null)))
-      .subscribe();
+      .subscribe(() => {
+        this.fetchInvoicesFromApi();
+        this.fetchOrdersFromApi();
+      });
 
     this.recalculateStats();
   }

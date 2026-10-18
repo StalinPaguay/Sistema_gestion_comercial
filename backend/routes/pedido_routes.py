@@ -412,6 +412,12 @@ def actualizar_estado(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido no encontrado.")
 
     pedido.Estado = datos.Estado
+
+    if datos.Estado == "Entregado":
+        from routes.factura_routes import emitir_factura_logica
+        user_id = getattr(_user, "UsuarioId", pedido.UsuarioId)
+        emitir_factura_logica(pedido, user_id, db)
+
     db.commit()
     db.refresh(pedido)
 

@@ -339,19 +339,131 @@
 
 .address-form { display: grid; gap: 10px; }
 .address-form-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.transfer-demo { display: grid; justify-items: center; gap: 8px; padding: 14px; border: 1px solid #f59e0b; border-radius: 10px; color: #78350f; background: #fffbeb; text-align: center; }
-.transfer-demo h4,.transfer-demo p { margin: 0; }
-.transfer-demo p,.transfer-demo span { font-size: 12px; line-height: 1.5; }
-.transfer-demo img { max-width: min(220px, 100%); height: auto; border-radius: 8px; background: #fff; }
-.card-demo { display: grid; gap: 10px; padding: 14px; border: 1px solid #f59e0b; border-radius: 10px; color: #78350f; background: #fffbeb; }
-.card-demo h4,.card-demo p { margin: 0; }
-.card-demo p { font-size: 12px; line-height: 1.5; }
-.card-demo-fields { display: grid; gap: 10px; }
-.card-demo-fields input { color: var(--app-input-text, #1e293b); background: var(--app-input, #fff); }
-.card-demo-fields.show-errors input:invalid { border-color: #dc2626; box-shadow: 0 0 0 2px rgb(220 38 38 / 15%); }
-.card-demo-error,.card-demo-valid { margin: 0; font-size: 12px; font-weight: 700; line-height: 1.5; }
-.card-demo-error { color: #b91c1c; }
-.card-demo-valid { color: #15803d; }
+.transfer-panel,
+.transfer-demo {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  color: #1e293b;
+  background: #f8fafc;
+  text-align: center;
+}
+
+.transfer-panel h4,
+.transfer-demo h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.transfer-panel p,
+.transfer-demo p {
+  margin: 0;
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.bank-info-box {
+  background: #ffffff;
+  border: 1px dashed #94a3b8;
+  border-radius: 8px;
+  padding: 10px 14px;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.bank-info-box p {
+  margin: 3px 0 !important;
+  font-size: 12px;
+  color: #1e293b;
+}
+
+.transfer-panel img,
+.transfer-demo img {
+  max-width: 200px;
+  height: auto;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 6%);
+}
+
+.card-panel,
+.card-demo {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  color: #1e293b;
+  background: #f8fafc;
+}
+
+.card-panel h4,
+.card-demo h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.card-panel p,
+.card-demo p {
+  margin: 0;
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.card-fields,
+.card-demo-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.card-row-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.card-fields input,
+.card-demo-fields input {
+  color: var(--app-input-text, #1e293b);
+  background: var(--app-input, #fff);
+  font-family: inherit;
+}
+
+.card-fields.show-errors input:invalid,
+.card-demo-fields.show-errors input:invalid {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 2px rgb(220 38 38 / 15%);
+}
+
+.card-error-text,
+.card-demo-error {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: #b91c1c;
+}
+
+.card-valid-text,
+.card-demo-valid {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: #15803d;
+}
 .checkout-instructions { margin: 0; color: var(--text-secondary, #64748b); font-size: 12px; line-height: 1.5; }
 .secondary-checkout-button,
 .cancel-checkout-button { min-height: 40px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 8px; color: #0759c7; background: #eff6ff; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }

@@ -146,10 +146,12 @@ export class ProductService {
         }
 
         return {
-          data: response.categorias.map((category) => ({
-            id_categoria: category.CategoriaId,
-            nombre: category.Nombre,
-          })),
+          data: response.categorias
+            .filter((category) => category.Estado !== false)
+            .map((category) => ({
+              id_categoria: category.CategoriaId,
+              nombre: category.Nombre,
+            })),
         };
       }),
     );

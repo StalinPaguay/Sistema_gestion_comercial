@@ -309,6 +309,10 @@ def actualizar_cliente(
 
     if datos.Estado is not None:
         cliente.Estado = datos.Estado
+        if cliente.PersonaId:
+            usuario_asoc = db.query(Usuario).filter(Usuario.PersonaId == cliente.PersonaId).first()
+            if usuario_asoc:
+                usuario_asoc.Estado = datos.Estado
 
     db.commit()
     db.refresh(cliente)

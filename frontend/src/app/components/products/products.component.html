@@ -153,7 +153,7 @@
         </div>
       </section>
 
-      <section id="promociones" class="promotions-section" aria-labelledby="promotions-title">
+      <section id="promociones" *ngIf="filteredPromotions.length > 0 || promotionsLoading || promotionsError" class="promotions-section" aria-labelledby="promotions-title">
         <div class="promotions-heading">
           <div>
             <p class="promotions-eyebrow">OFERTAS VIGENTES</p>
@@ -167,11 +167,8 @@
         <p *ngIf="promotionsError" class="promotions-state promotions-error" role="alert">
           {{ promotionsError }}
         </p>
-        <p *ngIf="!promotionsLoading && !promotionsError && !promotions.length" class="promotions-state">
-          No hay promociones activas en este momento. Vuelve pronto para conocer nuevas ofertas.
-        </p>
-        <div *ngIf="!promotionsLoading && promotions.length" class="promotions-grid">
-          <article *ngFor="let promotion of promotions" class="promotion-card">
+        <div *ngIf="!promotionsLoading && filteredPromotions.length" class="promotions-grid">
+          <article *ngFor="let promotion of filteredPromotions" class="promotion-card">
             <span class="promotion-discount">{{ formatPromotionValue(promotion) }}</span>
             <h3>{{ promotion.Nombre }}</h3>
             <p class="promotion-condition">Compra mínima: {{ promotion.MontoMinimoCompra | currency: 'USD' }}</p>
@@ -283,11 +280,11 @@
                   </button>
                   <button
                     class="btn-add-cart"
+                    [class.out-of-stock]="item.stock <= 0"
                     type="button"
-                    [disabled]="item.stock <= 0"
                     (click)="addToCart(item)"
                   >
-                    Agregar al Carrito
+                    {{ item.stock <= 0 ? 'Agotado' : 'Agregar al Carrito' }}
                   </button>
                 </div>
               </div>
@@ -317,9 +314,9 @@
         </ng-container>
       </section>
       <div *ngIf="cartNotice" class="cart-toast" [class.error]="cartNoticeError" role="status">
-        <mat-icon aria-hidden="true">shopping_cart_checkout</mat-icon>
+        <mat-icon aria-hidden="true">{{ cartNoticeError ? 'error_outline' : 'check_circle' }}</mat-icon>
         <span>{{ cartNotice }}</span>
-        <a routerLink="/cart">Ver carrito</a>
+        <a *ngIf="!cartNoticeError" routerLink="/cart">Ver carrito</a>
       </div>
     </main>
   </div>
@@ -355,11 +352,11 @@
           <div *ngIf="detailWarning" class="detail-error" role="alert">{{ detailWarning }}</div>
           <button
             class="btn-add-cart detail-add-cart"
+            [class.out-of-stock]="product.stock <= 0"
             type="button"
-            [disabled]="product.stock <= 0"
             (click)="addToCart(product)"
           >
-            Agregar al Carrito
+            {{ product.stock <= 0 ? 'Agotado' : 'Agregar al Carrito' }}
           </button>
         </div>
       </div>

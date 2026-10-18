@@ -6,7 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -20,6 +20,7 @@ from models.pedido import Pedido
 from models.pedido_detalle import PedidoDetalle
 from models.usuario import Usuario
 from services.auth_service import get_current_user
+from services.pdf_service import generar_pdf_factura
 
 router = APIRouter(
     tags=["Facturación y Pagos"],
@@ -79,6 +80,8 @@ def serializar_factura(fac: Factura, db: Session) -> dict[str, Any]:
             "Email": cli.Persona.Email,
         }
 
+    fecha_iso = fac.Fecha.isoformat() if fac.Fecha else None
+
     return {
         "FacturaId": fac.FacturaId,
         "Numero": fac.Numero,
@@ -86,14 +89,74 @@ def serializar_factura(fac: Factura, db: Session) -> dict[str, Any]:
         "PedidoId": fac.PedidoId,
         "ClienteId": fac.ClienteId,
         "Cliente": cli_info,
-        "Fecha": fac.Fecha.isoformat() if fac.Fecha else None,
+        "Fecha": fecha_iso,
+        "FechaEmision": fecha_iso,
         "Subtotal": str(fac.Subtotal),
         "Descuento": str(fac.Descuento),
+        "DescuentoTotal": str(fac.Descuento),
         "Impuesto": str(fac.Impuesto),
+        "IVA": str(fac.Impuesto),
         "Total": str(fac.Total),
         "Estado": fac.Estado,
         "Items": items,
+        "detalles": items,
     }
+
+
+def emitir_factura_logica(pedido: Pedido, usuario_id: int, db: Session) -> Factura | None:
+    """Emite una factura para un pedido dado, evitando duplicados."""
+    factura_existente = (
+        db.query(Factura)
+        .filter(Factura.PedidoId == pedido.PedidoId, Factura.Estado != "Anulada")
+        .first()
+    )
+    if factura_existente:
+        if pedido.Estado == "Entregado" and factura_existente.Estado != "Pagada":
+            factura_existente.Estado = "Pagada"
+            db.flush()
+        return factura_existente
+
+    detalles_pedido = db.query(PedidoDetalle).filter(PedidoDetalle.PedidoId == pedido.PedidoId).all()
+    if not detalles_pedido:
+        return None
+
+    numero = generar_numero_factura(db)
+    estado_factura = "Pagada" if pedido.Estado == "Entregado" else "Emitida"
+
+    factura = Factura(
+        Numero=numero,
+        PedidoId=pedido.PedidoId,
+        ClienteId=pedido.ClienteId,
+        UsuarioId=usuario_id,
+        Fecha=datetime.now(),
+        Subtotal=Decimal("0.00"),
+        Descuento=Decimal("0.00"),
+        Impuesto=Decimal("0.00"),
+        Total=Decimal("0.00"),
+        Estado=estado_factura,
+    )
+    db.add(factura)
+    db.flush()
+
+    for d in detalles_pedido:
+        desc_val = d.Descuento if d.Descuento else Decimal("0.00")
+        desc_pct = round((desc_val / d.Subtotal) * Decimal("100.0"), 2) if d.Subtotal > 0 else Decimal("0.00")
+        line_total = max(Decimal("0.00"), d.Subtotal - desc_val)
+        det_fac = DetalleFactura(
+            FacturaId=factura.FacturaId,
+            ProductoId=d.ProductoId,
+            Cantidad=d.Cantidad,
+            PrecioUnitario=d.PrecioUnitario,
+            DescuentoPorcentaje=desc_pct,
+            DescuentoValor=desc_val,
+            Subtotal=d.Subtotal,
+            Total=line_total,
+        )
+        db.add(det_fac)
+
+    db.flush()
+    db.refresh(factura)
+    return factura
 
 
 # ============================================================
@@ -109,6 +172,22 @@ def listar_facturas(
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(get_current_user),
 ):
+    # Auto-emitir facturas para cualquier pedido Entregado que aún no tenga factura registrada
+    pedidos_entregados_sin_fac = (
+        db.query(Pedido)
+        .filter(
+            Pedido.Estado == "Entregado",
+            ~Pedido.PedidoId.in_(
+                db.query(Factura.PedidoId).filter(Factura.PedidoId != None, Factura.Estado != "Anulada")
+            ),
+        )
+        .all()
+    )
+    if pedidos_entregados_sin_fac:
+        for ped in pedidos_entregados_sin_fac:
+            emitir_factura_logica(ped, ped.UsuarioId, db)
+        db.commit()
+
     query = db.query(Factura)
 
     if usuario.Rol and usuario.Rol.Nombre == "Cliente":
@@ -151,6 +230,44 @@ def obtener_factura(
     return serializar_factura(fac, db)
 
 
+@router.get("/facturas/{factura_id}/pdf", summary="Visualizar o descargar factura en PDF")
+def descargar_factura_pdf(
+    factura_id: int,
+    token: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    usuario = None
+    if token:
+        from services.auth_service import decodificar_token
+        try:
+            payload = decodificar_token(token)
+            usuario_id = int(payload.get("sub"))
+            usuario = db.get(Usuario, usuario_id)
+        except Exception:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de acceso inválido o expirado.")
+
+    fac = db.get(Factura, factura_id)
+    if not fac:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Factura no encontrada.")
+
+    if usuario and usuario.Rol and usuario.Rol.Nombre == "Cliente":
+        cliente = db.query(Cliente).filter(Cliente.PersonaId == usuario.PersonaId).first()
+        if not cliente or fac.ClienteId != cliente.ClienteId:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado para descargar esta factura.")
+
+    pdf_bytes = generar_pdf_factura(fac, db)
+    filename = f"{fac.Numero or f'Factura-{fac.FacturaId}'}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "Cache-Control": "no-cache",
+        },
+    )
+
+
 @router.post("/facturas", status_code=status.HTTP_201_CREATED, summary="Emitir factura a partir de un pedido")
 def emitir_factura(
     datos: EmitirFacturaEntrada,
@@ -181,45 +298,15 @@ def emitir_factura(
         )
 
     try:
-        numero = generar_numero_factura(db)
-
-        factura = Factura(
-            Numero=numero,
-            PedidoId=pedido.PedidoId,
-            ClienteId=pedido.ClienteId,
-            UsuarioId=usuario.UsuarioId,
-            Fecha=datetime.now(),
-            Subtotal=Decimal("0.00"),
-            Descuento=Decimal("0.00"),
-            Impuesto=Decimal("0.00"),
-            Total=Decimal("0.00"),
-            Estado="Emitida",
-        )
-        db.add(factura)
-        db.flush()
-
-        for d in detalles_pedido:
-            desc_val = d.Descuento if d.Descuento else Decimal("0.00")
-            desc_pct = round((desc_val / d.Subtotal) * Decimal("100.0"), 2) if d.Subtotal > 0 else Decimal("0.00")
-            line_total = max(Decimal("0.00"), d.Subtotal - desc_val)
-            det_fac = DetalleFactura(
-                FacturaId=factura.FacturaId,
-                ProductoId=d.ProductoId,
-                Cantidad=d.Cantidad,
-                PrecioUnitario=d.PrecioUnitario,
-                DescuentoPorcentaje=desc_pct,
-                DescuentoValor=desc_val,
-                Subtotal=d.Subtotal,
-                Total=line_total,
-            )
-            db.add(det_fac)
-
-        db.flush()
+        factura = emitir_factura_logica(pedido, usuario.UsuarioId, db)
+        if not factura:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No se pudo emitir la factura.")
         db.commit()
         db.refresh(factura)
-
         return serializar_factura(factura, db)
-
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as error:
         db.rollback()
         raise HTTPException(
