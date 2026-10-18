@@ -81,9 +81,35 @@
           <span>Subtotal</span>
           <strong>{{ cartService.subtotal() | currency: 'USD' }}</strong>
         </div>
+        <div class="coupon-box">
+          <label for="coupon-code">Cupón de descuento</label>
+          <div class="coupon-row">
+            <input
+              id="coupon-code"
+              type="text"
+              placeholder="Ej: VERANO15"
+              [value]="couponInput"
+              [disabled]="!!appliedCoupon()"
+              (input)="onCouponInput($event)"
+              (keydown.enter)="applyCoupon()"
+            />
+            <button *ngIf="!appliedCoupon()" type="button" [disabled]="couponLoading()" (click)="applyCoupon()">
+              {{ couponLoading() ? 'Validando…' : 'Aplicar' }}
+            </button>
+            <button *ngIf="appliedCoupon()" type="button" (click)="removeCoupon()">Quitar</button>
+          </div>
+          <p *ngIf="couponError()" class="coupon-error" role="alert">{{ couponError() }}</p>
+          <p *ngIf="appliedCoupon() as coupon" class="coupon-ok">
+            Cupón {{ coupon.codigo_cupon }} aplicado: {{ coupon.nombre }}
+          </p>
+        </div>
+        <div class="summary-line" *ngIf="appliedCoupon()">
+          <span>Descuento</span>
+          <strong class="coupon-discount">-{{ discount() | currency: 'USD' }}</strong>
+        </div>
         <div class="summary-line">
           <span>IVA (15%)</span>
-          <strong>{{ cartService.tax() | currency: 'USD' }}</strong>
+          <strong>{{ taxAfterDiscount() | currency: 'USD' }}</strong>
         </div>
         <div class="summary-line">
           <span>Envío</span>
@@ -92,7 +118,7 @@
         <p class="shipping-note">Envío gratis para este pedido.</p>
         <div class="summary-total">
           <span>Total</span>
-          <strong>{{ cartService.total() | currency: 'USD' }}</strong>
+          <strong>{{ totalAfterDiscount() | currency: 'USD' }}</strong>
         </div>
         <button
           *ngIf="!checkoutDetailsOpen()"

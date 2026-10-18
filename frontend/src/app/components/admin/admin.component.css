@@ -1263,4 +1263,39 @@
   background-color: #0f172a !important;
   color: #f8fafc;
 }
+/* ============================================================
+   PROMOCIONES: CÓDIGO DE CUPÓN Y CONTRASTE
+   ============================================================ */
+.promo-code {
+  margin: 0 0 10px 0;
+  font-size: 0.85rem;
+  color: #334155;
+}
 
+.promo-code strong {
+  letter-spacing: 0.04em;
+  color: #ea580c;
+}
+
+.promo-code-empty {
+  color: #64748b;
+  font-style: italic;
+}
+
+.dark-theme .promo-validity,
+.dark-theme .promo-validity small,
+.dark-theme .entity-card-desc {
+  color: #b6c3d6;
+}
+
+.dark-theme .promo-code {
+  color: #cbd5e1;
+}
+
+.dark-theme .promo-code-empty {
+  color: #94a3b8;
+}
+
+.dark-theme .min-amount {
+  color: #1e293b;
+}

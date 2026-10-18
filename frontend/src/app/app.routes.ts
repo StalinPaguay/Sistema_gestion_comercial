@@ -30,6 +30,11 @@ export const routes: Routes = [
     loadComponent: () => import('./components/cart/cart').then((module) => module.Cart),
   },
   {
+    path: 'facturas',
+    loadComponent: () =>
+      import('./components/billing/facturacion').then((module) => module.Facturacion),
+  },
+  {
     path: 'order-history',
     loadComponent: () =>
       import('./components/order-history/order-history.component').then(

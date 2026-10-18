@@ -1,11 +1,22 @@
 import { CurrencyPipe, NgFor, NgIf } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, ElementRef, inject, OnInit, signal, ViewChild } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  ElementRef,
+  inject,
+  OnInit,
+  signal,
+  untracked,
+  ViewChild,
+} from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { catchError, forkJoin, of, throwError } from 'rxjs';
 import QRCode from 'qrcode';
 import { AuthService } from '../../services/auth.service';
 import { CartItem, CartService } from '../../services/cart.service';
+import { CouponValidation, PromotionService } from '../../services/promotion.service';
 import { Product, ProductService } from '../../services/product.service';
 import { CreateOrderRequest, CustomerOrder, OrderService, PaymentMethod } from '../../services/order.service';
 import { DeliveryAddress, DeliveryAddressInput, UserService } from '../../services/user.service';
@@ -23,6 +34,7 @@ export class Cart implements OnInit {
   private readonly userService = inject(UserService);
   private readonly orderService = inject(OrderService);
   private readonly router = inject(Router);
+  private readonly promotionService = inject(PromotionService);
   @ViewChild('cardDemoForm') private cardDemoForm?: ElementRef<HTMLFormElement>;
   protected recommendedProducts: Product[] = [];
   protected feedback = '';
@@ -42,6 +54,36 @@ export class Cart implements OnInit {
   protected readonly orderSubmitting = signal(false);
   protected addressDraft = { Provincia: '', Ciudad: '', Direccion: '', Referencia: '' };
   private transferQrGeneration = 0;
+
+  // ----- Cupones de descuento -----
+  protected couponInput = '';
+  protected readonly appliedCoupon = signal<CouponValidation | null>(null);
+  protected readonly couponLoading = signal(false);
+  protected readonly couponError = signal('');
+  protected readonly discount = computed(() => Number(this.appliedCoupon()?.monto_descuento ?? 0));
+  protected readonly taxAfterDiscount = computed(
+    () => Math.round(((this.cartService.subtotal() - this.discount()) * 0.15 + Number.EPSILON) * 100) / 100,
+  );
+  protected readonly totalAfterDiscount = computed(
+    () =>
+      this.cartService.subtotal() -
+      this.discount() +
+      this.taxAfterDiscount() +
+      this.cartService.shipping(),
+  );
+
+  constructor() {
+    // Si el carrito cambia después de aplicar un cupón, el descuento ya no es válido.
+    effect(() => {
+      this.cartService.subtotal();
+      untracked(() => {
+        if (this.appliedCoupon()) {
+          this.appliedCoupon.set(null);
+          this.couponError.set('El carrito cambió. Vuelve a aplicar el cupón.');
+        }
+      });
+    });
+  }
 
   ngOnInit(): void {
     this.productService.getProducts().subscribe({
@@ -134,6 +176,45 @@ export class Cart implements OnInit {
       return;
     }
     this.feedback = 'No se pudo actualizar el carrito. Inténtalo de nuevo.';
+  }
+
+  protected onCouponInput(event: Event): void {
+    if (event.target instanceof HTMLInputElement) {
+      this.couponInput = event.target.value;
+    }
+  }
+
+  protected applyCoupon(): void {
+    const code = this.couponInput.trim().toUpperCase();
+    if (!code || this.couponLoading()) return;
+    if (!this.cartService.items().length) {
+      this.couponError.set('Agrega productos al carrito antes de aplicar un cupón.');
+      return;
+    }
+
+    this.couponLoading.set(true);
+    this.couponError.set('');
+    const productIds = this.cartService.items().map((item) => item.product.productoId);
+    this.promotionService.validateCoupon(code, this.cartService.subtotal(), productIds).subscribe({
+      next: (result) => {
+        this.appliedCoupon.set(result);
+        this.couponLoading.set(false);
+      },
+      error: (error: unknown) => {
+        this.appliedCoupon.set(null);
+        const detail = error instanceof HttpErrorResponse ? error.error?.detail : null;
+        this.couponError.set(
+          typeof detail === 'string' ? detail : 'No se pudo validar el cupón. Inténtalo de nuevo.',
+        );
+        this.couponLoading.set(false);
+      },
+    });
+  }
+
+  protected removeCoupon(): void {
+    this.appliedCoupon.set(null);
+    this.couponInput = '';
+    this.couponError.set('');
   }
 
   protected checkout(): void {
@@ -354,6 +435,7 @@ export class Cart implements OnInit {
         ProductoId: item.product.productoId,
         Cantidad: item.quantity,
       })),
+      CodigoCupon: this.appliedCoupon()?.codigo_cupon,
     };
     this.feedback = '';
     this.orderSubmitting.set(true);
@@ -362,6 +444,7 @@ export class Cart implements OnInit {
         this.cardDemoValid.set(false);
         this.cardDemoSubmitted.set(false);
         this.cardDemoErrors.set([]);
+        this.appliedCoupon.set(null);
         this.cartService.clear();
         this.orderSubmitting.set(false);
         this.cartService.clearRemoteCart().subscribe({

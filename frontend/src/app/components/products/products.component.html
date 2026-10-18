@@ -138,7 +138,7 @@
           <mat-icon>chevron_right</mat-icon>
         </button>
         <div class="hero-action">
-          <a class="btn-orange" href="#promociones">Ver descuentos</a>
+          <a class="btn-orange" routerLink="/products" fragment="promociones">Ver descuentos</a>
         </div>
         <div class="slider-dots" aria-label="Seleccionar publicidad">
           <button
@@ -159,7 +159,7 @@
             <p class="promotions-eyebrow">OFERTAS VIGENTES</p>
             <h2 id="promotions-title">Descuentos y promociones</h2>
           </div>
-          <a href="#productos">Explorar catálogo</a>
+          <a routerLink="/products" fragment="productos">Explorar catálogo</a>
         </div>
         <p *ngIf="promotionsLoading" class="promotions-state" role="status">
           Cargando promociones activas…
@@ -181,7 +181,7 @@
               <strong>{{ promotion.CodigoCupon }}</strong>
             </div>
             <p *ngIf="promotion.FechaFin" class="promotion-expiry">
-              Vigente hasta {{ promotion.FechaFin | date: 'mediumDate' }}
+              Vigente hasta {{ promotion.FechaFin | date: 'dd/MM/yyyy' }}
             </p>
           </article>
         </div>
@@ -424,7 +424,7 @@
               </span>
             </div>
             <p *ngIf="review.Comentario">{{ review.Comentario }}</p>
-            <time *ngIf="review.Fecha">{{ review.Fecha | date: 'mediumDate' }}</time>
+            <time *ngIf="review.Fecha">{{ review.Fecha | date: 'dd/MM/yyyy' }}</time>
           </article>
         </div>
       </div>

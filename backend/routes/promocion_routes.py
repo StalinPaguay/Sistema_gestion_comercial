@@ -1,9 +1,10 @@
+
 # ============================================================
 # RUTAS DE PROMOCIONES Y CUPONES DE DESCUENTO - TECNOMEGA
 # ============================================================
 
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -16,7 +17,7 @@ from models.producto import Producto
 from models.promocion import Promocion
 from models.promocion_categoria import PromocionCategoria
 from models.promocion_producto import PromocionProducto
-from services.auth_service import get_current_user, require_admin
+from services.auth_service import require_admin
 
 router = APIRouter(
     prefix="/promociones",
@@ -29,22 +30,29 @@ router = APIRouter(
 # ============================================================
 
 class PromocionEntrada(BaseModel):
-    Nombre: str = Field(min_length=2, max_length=150, description="Nombre de la promoción")
-    CodigoCupon: str | None = Field(default=None, max_length=50, description="Código de cupón opcional (ej: VERANO15)")
+    Nombre: str = Field(min_length=2, max_length=150)
+    CodigoCupon: str | None = Field(default=None, max_length=50)
     TipoDescuento: str = Field(
-        pattern="^(PORCENTAJE|MONTO_FIJO)$",
-        description="Tipo de descuento: PORCENTAJE o MONTO_FIJO",
+        pattern="^(PORCENTAJE|MONTO_FIJO)$"
     )
-    ValorDescuento: Decimal = Field(gt=0, max_digits=18, decimal_places=2, description="Valor del descuento")
-    MontoMinimoCompra: Decimal = Field(default=Decimal("0.00"), ge=0, max_digits=18, decimal_places=2)
-    FechaInicio: datetime = Field(description="Fecha de inicio de vigencia")
-    FechaFin: datetime = Field(description="Fecha de fin de vigencia")
-    ProductosIds: list[int] | None = Field(default=None, description="Productos específicos a los que aplica")
-    CategoriasIds: list[int] | None = Field(default=None, description="Categorías específicas a las que aplica")
+    ValorDescuento: Decimal = Field(
+        gt=0, max_digits=18, decimal_places=2
+    )
+    MontoMinimoCompra: Decimal = Field(
+        default=Decimal("0.00"),
+        ge=0,
+        max_digits=18,
+        decimal_places=2,
+    )
+    FechaInicio: datetime
+    FechaFin: datetime
+    ProductosIds: list[int] | None = None
+    CategoriasIds: list[int] | None = None
 
 
 class PromocionActualizacion(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
     Nombre: str | None = None
     CodigoCupon: str | None = None
     TipoDescuento: str | None = None
@@ -56,14 +64,35 @@ class PromocionActualizacion(BaseModel):
 
 
 class ValidarCuponEntrada(BaseModel):
-    CodigoCupon: str = Field(min_length=1, description="Código del cupón a validar")
-    Subtotal: Decimal = Field(ge=0, description="Subtotal de la compra para validar monto mínimo")
-    ProductosIds: list[int] | None = Field(default=None, description="Lista de IDs de productos en el carrito")
+    CodigoCupon: str = Field(min_length=1)
+    Subtotal: Decimal = Field(ge=0)
+    ProductosIds: list[int] | None = None
 
 
-def serializar_promocion(p: Promocion, db: Session) -> dict[str, Any]:
-    prods = db.query(PromocionProducto).filter(PromocionProducto.PromocionId == p.PromocionId).all()
-    cats = db.query(PromocionCategoria).filter(PromocionCategoria.PromocionId == p.PromocionId).all()
+# ============================================================
+# SERIALIZACIÓN
+# ============================================================
+
+def serializar_promocion(
+    p: Promocion,
+    db: Session,
+) -> dict[str, Any]:
+
+    prods = (
+        db.query(PromocionProducto)
+        .filter(
+            PromocionProducto.PromocionId == p.PromocionId
+        )
+        .all()
+    )
+
+    cats = (
+        db.query(PromocionCategoria)
+        .filter(
+            PromocionCategoria.PromocionId == p.PromocionId
+        )
+        .all()
+    )
 
     return {
         "PromocionId": p.PromocionId,
@@ -72,8 +101,14 @@ def serializar_promocion(p: Promocion, db: Session) -> dict[str, Any]:
         "TipoDescuento": p.TipoDescuento,
         "ValorDescuento": str(p.ValorDescuento),
         "MontoMinimoCompra": str(p.MontoMinimoCompra),
-        "FechaInicio": p.FechaInicio.isoformat() if p.FechaInicio else None,
-        "FechaFin": p.FechaFin.isoformat() if p.FechaFin else None,
+        "FechaInicio": (
+            p.FechaInicio.isoformat()
+            if p.FechaInicio else None
+        ),
+        "FechaFin": (
+            p.FechaFin.isoformat()
+            if p.FechaFin else None
+        ),
         "Estado": p.Estado,
         "ProductosIds": [x.ProductoId for x in prods],
         "CategoriasIds": [x.CategoriaId for x in cats],
@@ -81,7 +116,7 @@ def serializar_promocion(p: Promocion, db: Session) -> dict[str, Any]:
 
 
 # ============================================================
-# ENDPOINTS
+# LISTAR PROMOCIONES
 # ============================================================
 
 @router.get("", summary="Listar promociones")
@@ -92,30 +127,54 @@ def listar_promociones(
     db: Session = Depends(get_db),
 ):
     query = db.query(Promocion)
+
     if not incluir_inactivas:
         now = datetime.now()
         query = query.filter(
-            Promocion.Estado == True,
+            Promocion.Estado.is_(True),
             Promocion.FechaInicio <= now,
             Promocion.FechaFin >= now,
         )
 
-    promos = query.order_by(Promocion.PromocionId.desc()).offset(desde).limit(limite).all()
+    promos = (
+        query.order_by(Promocion.PromocionId.desc())
+        .offset(desde)
+        .limit(limite)
+        .all()
+    )
+
     return [serializar_promocion(p, db) for p in promos]
 
 
-@router.get("/{promocion_id}", summary="Detalle de una promoción por ID")
+# ============================================================
+# OBTENER UNA PROMOCIÓN
+# ============================================================
+
+@router.get("/{promocion_id}", summary="Detalle de promoción")
 def obtener_promocion(
     promocion_id: int,
     db: Session = Depends(get_db),
 ):
     promo = db.get(Promocion, promocion_id)
+
     if not promo:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promoción no encontrada.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Promoción no encontrada.",
+        )
+
     return serializar_promocion(promo, db)
 
 
-@router.post("", status_code=status.HTTP_201_CREATED, summary="Crear nueva promoción (Admin)")
+# ============================================================
+# CREAR PROMOCIÓN
+# ============================================================
+
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear promoción (Admin)",
+)
 def crear_promocion(
     datos: PromocionEntrada,
     db: Session = Depends(get_db),
@@ -127,22 +186,65 @@ def crear_promocion(
             detail="La fecha de fin no puede ser anterior a la fecha de inicio.",
         )
 
-    if datos.TipoDescuento == "PORCENTAJE" and datos.ValorDescuento > Decimal("100.00"):
+    if (
+        datos.TipoDescuento == "PORCENTAJE"
+        and datos.ValorDescuento > Decimal("100.00")
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El porcentaje de descuento no puede ser superior al 100%.",
+            detail="El porcentaje no puede superar el 100%.",
         )
 
-    codigo_limpio = datos.CodigoCupon.strip().upper() if datos.CodigoCupon else None
+    codigo_limpio = (
+        datos.CodigoCupon.strip().upper()
+        if datos.CodigoCupon else None
+    )
+
     if codigo_limpio:
-        existe = db.query(Promocion).filter(Promocion.CodigoCupon == codigo_limpio).first()
+        existe = (
+            db.query(Promocion)
+            .filter(Promocion.CodigoCupon == codigo_limpio)
+            .first()
+        )
+
         if existe:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Ya existe una promoción registrada con ese código de cupón.",
+                detail="Ya existe una promoción con ese código.",
             )
 
+    productos_ids = set(datos.ProductosIds or [])
+    categorias_ids = set(datos.CategoriasIds or [])
+
     try:
+        if productos_ids:
+            existentes = {
+                p.ProductoId
+                for p in db.query(Producto)
+                .filter(Producto.ProductoId.in_(productos_ids))
+                .all()
+            }
+
+            if existentes != productos_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Uno o más productos no existen.",
+                )
+
+        if categorias_ids:
+            existentes = {
+                c.CategoriaId
+                for c in db.query(Categoria)
+                .filter(Categoria.CategoriaId.in_(categorias_ids))
+                .all()
+            }
+
+            if existentes != categorias_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Una o más categorías no existen.",
+                )
+
         promo = Promocion(
             Nombre=datos.Nombre.strip(),
             CodigoCupon=codigo_limpio,
@@ -153,19 +255,29 @@ def crear_promocion(
             FechaFin=datos.FechaFin,
             Estado=True,
         )
+
         db.add(promo)
         db.flush()
 
-        if datos.ProductosIds:
-            for pid in datos.ProductosIds:
-                db.add(PromocionProducto(PromocionId=promo.PromocionId, ProductoId=pid))
+        for pid in productos_ids:
+            db.add(
+                PromocionProducto(
+                    PromocionId=promo.PromocionId,
+                    ProductoId=pid,
+                )
+            )
 
-        if datos.CategoriasIds:
-            for cid in datos.CategoriasIds:
-                db.add(PromocionCategoria(PromocionId=promo.PromocionId, CategoriaId=cid))
+        for cid in categorias_ids:
+            db.add(
+                PromocionCategoria(
+                    PromocionId=promo.PromocionId,
+                    CategoriaId=cid,
+                )
+            )
 
         db.commit()
         db.refresh(promo)
+
         return serializar_promocion(promo, db)
 
     except HTTPException:
@@ -179,6 +291,10 @@ def crear_promocion(
         ) from error
 
 
+# ============================================================
+# ACTUALIZAR PROMOCIÓN
+# ============================================================
+
 @router.patch("/{promocion_id}", summary="Actualizar promoción (Admin)")
 def actualizar_promocion(
     promocion_id: int,
@@ -187,23 +303,109 @@ def actualizar_promocion(
     _user: Any = Depends(require_admin),
 ):
     promo = db.get(Promocion, promocion_id)
+
     if not promo:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promoción no encontrada.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Promoción no encontrada.",
+        )
 
     campos = datos.model_dump(exclude_unset=True)
+
     if not campos:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No se enviaron campos.")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No se enviaron campos.",
+        )
 
-    for k, v in campos.items():
-        if k == "CodigoCupon" and v:
-            setattr(promo, k, v.strip().upper())
-        else:
-            setattr(promo, k, v)
+    tipo = campos.get("TipoDescuento", promo.TipoDescuento)
+    valor = campos.get("ValorDescuento", promo.ValorDescuento)
 
-    db.commit()
-    db.refresh(promo)
-    return serializar_promocion(promo, db)
+    if tipo not in ("PORCENTAJE", "MONTO_FIJO"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El tipo de descuento no es válido.",
+        )
 
+    if valor is not None and valor <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El valor del descuento debe ser mayor que cero.",
+        )
+
+    if (
+        tipo == "PORCENTAJE"
+        and valor is not None
+        and valor > Decimal("100.00")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El porcentaje no puede superar el 100%.",
+        )
+
+    minimo = campos.get("MontoMinimoCompra", promo.MontoMinimoCompra)
+    if minimo is not None and minimo < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El monto mínimo no puede ser negativo.",
+        )
+
+    nuevo_inicio = campos.get("FechaInicio", promo.FechaInicio)
+    nuevo_fin = campos.get("FechaFin", promo.FechaFin)
+
+    if nuevo_inicio and nuevo_fin and nuevo_fin < nuevo_inicio:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La fecha de fin no puede ser anterior a la de inicio.",
+        )
+
+    if "Nombre" in campos and campos["Nombre"] is not None:
+        campos["Nombre"] = campos["Nombre"].strip()
+        if len(campos["Nombre"]) < 2:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El nombre debe tener al menos 2 caracteres.",
+            )
+
+    if "CodigoCupon" in campos:
+        codigo = campos["CodigoCupon"]
+        codigo = codigo.strip().upper() if codigo else None
+
+        if codigo:
+            duplicado = (
+                db.query(Promocion)
+                .filter(
+                    Promocion.CodigoCupon == codigo,
+                    Promocion.PromocionId != promocion_id,
+                )
+                .first()
+            )
+
+            if duplicado:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Ya existe una promoción con ese código.",
+                )
+
+        campos["CodigoCupon"] = codigo
+
+    try:
+        for campo, valor_campo in campos.items():
+            setattr(promo, campo, valor_campo)
+
+        db.commit()
+        db.refresh(promo)
+
+        return serializar_promocion(promo, db)
+
+    except Exception:
+        db.rollback()
+        raise
+
+
+# ============================================================
+# DESACTIVAR PROMOCIÓN
+# ============================================================
 
 @router.delete("/{promocion_id}", summary="Desactivar promoción (Admin)")
 def desactivar_promocion(
@@ -212,46 +414,169 @@ def desactivar_promocion(
     _user: Any = Depends(require_admin),
 ):
     promo = db.get(Promocion, promocion_id)
+
     if not promo:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promoción no encontrada.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Promoción no encontrada.",
+        )
 
     promo.Estado = False
     db.commit()
+
     return {"message": "Promoción desactivada correctamente."}
 
 
-@router.post("/validar-cupon", summary="Validar código de cupón y calcular descuento aplicable")
+# ============================================================
+# VALIDAR CUPÓN
+# ============================================================
+
+@router.post(
+    "/validar-cupon",
+    summary="Validar cupón y calcular descuento",
+)
 def validar_cupon(
     datos: ValidarCuponEntrada,
     db: Session = Depends(get_db),
 ):
-    """
-    Endpoint utilizado por el Frontend para verificar si un cupón es válido
-    y calcular el ahorro antes de confirmar la compra.
-    """
     codigo = datos.CodigoCupon.strip().upper()
+    subtotal = datos.Subtotal.quantize(
+        Decimal("0.01"),
+        rounding=ROUND_HALF_UP,
+    )
     now = datetime.now()
 
-    promo = db.query(Promocion).filter(Promocion.CodigoCupon == codigo, Promocion.Estado == True).first()
-    if not promo:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cupón no encontrado o inactivo.")
-
-    if now < promo.FechaInicio or now > promo.FechaFin:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El cupón está fuera de su fecha de vigencia.")
-
-    if datos.Subtotal < promo.MontoMinimoCompra:
+    if not codigo:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"El subtotal (${datos.Subtotal}) no alcanza el monto mínimo requerido para este cupón (${promo.MontoMinimoCompra}).",
+            detail="Ingresa un código de cupón.",
         )
 
-    # Calcular monto de descuento
-    if promo.TipoDescuento == "PORCENTAJE":
-        descuento = round(datos.Subtotal * (promo.ValorDescuento / Decimal("100.0")), 2)
-    else:
-        descuento = min(promo.ValorDescuento, datos.Subtotal)
+    if subtotal <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El subtotal debe ser mayor que cero.",
+        )
 
-    total_con_descuento = max(Decimal("0.00"), datos.Subtotal - descuento)
+    promo = (
+        db.query(Promocion)
+        .filter(
+            Promocion.CodigoCupon == codigo,
+            Promocion.Estado.is_(True),
+        )
+        .first()
+    )
+
+    if not promo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cupón no encontrado o inactivo.",
+        )
+
+    if (
+        not promo.FechaInicio
+        or not promo.FechaFin
+        or now < promo.FechaInicio
+        or now > promo.FechaFin
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El cupón está fuera de su fecha de vigencia.",
+        )
+
+    if subtotal < promo.MontoMinimoCompra:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"El subtotal (${subtotal}) no alcanza "
+                f"el mínimo requerido (${promo.MontoMinimoCompra})."
+            ),
+        )
+
+    ids_carrito = set(datos.ProductosIds or [])
+
+    if not ids_carrito:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Agrega productos al carrito antes de aplicar el cupón.",
+        )
+
+    productos_carrito = (
+        db.query(Producto)
+        .filter(Producto.ProductoId.in_(ids_carrito))
+        .all()
+    )
+
+    if len(productos_carrito) != len(ids_carrito):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uno o más productos del carrito no existen.",
+        )
+
+    productos_promo = {
+        x.ProductoId
+        for x in db.query(PromocionProducto)
+        .filter(
+            PromocionProducto.PromocionId == promo.PromocionId
+        )
+        .all()
+    }
+
+    categorias_promo = {
+        x.CategoriaId
+        for x in db.query(PromocionCategoria)
+        .filter(
+            PromocionCategoria.PromocionId == promo.PromocionId
+        )
+        .all()
+    }
+
+    if productos_promo or categorias_promo:
+        aplica = any(
+            producto.ProductoId in productos_promo
+            or producto.CategoriaId in categorias_promo
+            for producto in productos_carrito
+        )
+
+        if not aplica:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Este cupón no aplica a los productos "
+                    "o categorías de tu carrito."
+                ),
+            )
+
+    if promo.TipoDescuento == "PORCENTAJE":
+        descuento = (
+            subtotal * promo.ValorDescuento / Decimal("100")
+        ).quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP,
+        )
+
+    elif promo.TipoDescuento == "MONTO_FIJO":
+        descuento = min(
+            promo.ValorDescuento,
+            subtotal,
+        ).quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP,
+        )
+
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El tipo de descuento configurado no es válido.",
+        )
+
+    subtotal_con_descuento = max(
+        Decimal("0.00"),
+        subtotal - descuento,
+    ).quantize(
+        Decimal("0.01"),
+        rounding=ROUND_HALF_UP,
+    )
 
     return {
         "valido": True,
@@ -261,6 +586,6 @@ def validar_cupon(
         "tipo_descuento": promo.TipoDescuento,
         "valor_descuento": str(promo.ValorDescuento),
         "monto_descuento": str(descuento),
-        "subtotal_original": str(datos.Subtotal),
-        "subtotal_con_descuento": str(total_con_descuento),
+        "subtotal_original": str(subtotal),
+        "subtotal_con_descuento": str(subtotal_con_descuento),
     }

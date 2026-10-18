@@ -637,12 +637,17 @@
                     <span class="min-amount">Compra mín: {{ promo.montoMinimo | currency:'USD' }}</span>
                   }
                 </div>
-                <p class="entity-card-desc">{{ promo.descripcion }}</p>
+                @if (promo.codigoCupon) {
+                  <p class="promo-code">Código: <strong>{{ promo.codigoCupon }}</strong></p>
+                } @else {
+                  <p class="promo-code promo-code-empty">Sin código de cupón</p>
+                }
                 <div class="promo-validity">
-                  <small>📅 Vigencia: {{ promo.fechaInicio }} hasta {{ promo.fechaFin }}</small>
-                  <small>🎯 Aplica a: <strong>{{ promo.aplicaA }} {{ promo.referenciaNombre ? '(' + promo.referenciaNombre + ')' : '' }}</strong></small>
+                  <small>Vigencia: {{ promo.fechaInicio }} hasta {{ promo.fechaFin }}</small>
+                  <small>Aplica a: <strong>{{ adminService.promoScopeLabel(promo) }}</strong></small>
                 </div>
                 <div class="entity-card-footer">
+                  <button class="btn btn-sm btn-secondary" (click)="openEditPromotionModal(promo)">Editar</button>
                   <button class="btn btn-sm" [class.btn-danger]="promo.estado" [class.btn-secondary]="!promo.estado" (click)="togglePromoState(promo)">
                     {{ promo.estado ? 'Desactivar' : 'Activar' }}
                   </button>
@@ -988,26 +993,27 @@
   }
 
   <!-- ============================================== -->
-  <!-- MODAL: CREAR PROMOCIÓN (RF19, RF26, RF27)      -->
+  <!-- MODAL: CREAR / EDITAR PROMOCIÓN                -->
   <!-- ============================================== -->
   @if (showPromotionModal()) {
     <div class="modal-backdrop" (click)="showPromotionModal.set(false)">
       <div class="modal-dialog" (click)="$event.stopPropagation()">
         <header class="modal-header">
-          <h2>Configurar Nueva Promoción</h2>
+          <h2>{{ editingPromotionId() ? 'Editar Promoción' : 'Configurar Nueva Promoción' }}</h2>
           <button class="modal-close" (click)="showPromotionModal.set(false)">×</button>
         </header>
 
         <form [formGroup]="promotionForm" (ngSubmit)="savePromotion()">
           <div class="modal-body">
-            <div class="form-group">
-              <label>Nombre de la Promoción:</label>
-              <input type="text" formControlName="nombre" placeholder="Ej: Rebaja Especial Cyber Days" />
-            </div>
-
-            <div class="form-group">
-              <label>Descripción:</label>
-              <textarea rows="2" formControlName="descripcion"></textarea>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Nombre de la Promoción:</label>
+                <input type="text" formControlName="nombre" placeholder="Ej: Rebaja Especial Cyber Days" />
+              </div>
+              <div class="form-group">
+                <label>Código de cupón (opcional):</label>
+                <input type="text" formControlName="codigoCupon" maxlength="50" placeholder="Ej: VERANO15" />
+              </div>
             </div>
 
             <div class="form-row">
@@ -1031,13 +1037,40 @@
               </div>
               <div class="form-group">
                 <label>Aplica a:</label>
-                <select formControlName="aplicaA">
+                <select
+                  formControlName="aplicaA"
+                  [attr.disabled]="editingPromotionId() ? true : null"
+                  (change)="promotionForm.controls.referenciaId.setValue(null)"
+                >
                   <option value="General">Toda la tienda (General)</option>
                   <option value="Categoria">Por Categoría</option>
                   <option value="Producto">Producto Específico</option>
                 </select>
               </div>
             </div>
+
+            @if (promotionForm.controls.aplicaA.value === 'Categoria') {
+              <div class="form-group">
+                <label>Categoría:</label>
+                <select formControlName="referenciaId" [attr.disabled]="editingPromotionId() ? true : null">
+                  <option [ngValue]="null">Selecciona una categoría</option>
+                  @for (cat of adminService.categories(); track cat.categoriaId) {
+                    <option [ngValue]="cat.categoriaId">{{ cat.nombre }}</option>
+                  }
+                </select>
+              </div>
+            }
+            @if (promotionForm.controls.aplicaA.value === 'Producto') {
+              <div class="form-group">
+                <label>Producto:</label>
+                <select formControlName="referenciaId" [attr.disabled]="editingPromotionId() ? true : null">
+                  <option [ngValue]="null">Selecciona un producto</option>
+                  @for (prod of adminService.products(); track prod.productoId) {
+                    <option [ngValue]="prod.productoId">{{ prod.nombre }}</option>
+                  }
+                </select>
+              </div>
+            }
 
             <div class="form-row">
               <div class="form-group">
@@ -1052,7 +1085,9 @@
           </div>
           <footer class="modal-footer">
             <button type="button" class="btn btn-secondary" (click)="showPromotionModal.set(false)">Cancelar</button>
-            <button type="submit" class="btn btn-primary" [disabled]="promotionForm.invalid">Guardar Promoción</button>
+            <button type="submit" class="btn btn-primary" [disabled]="promotionForm.invalid">
+              {{ editingPromotionId() ? 'Guardar Cambios' : 'Guardar Promoción' }}
+            </button>
           </footer>
         </form>
       </div>

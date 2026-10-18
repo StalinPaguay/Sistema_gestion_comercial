@@ -1,0 +1,70 @@
+<div class="facturas-page">
+  <header class="page-header">
+    <div>
+      <span class="eyebrow">TECNOMEGA / VENTAS</span>
+      <h1>Facturas</h1>
+      <p>Consulta los comprobantes asociados a los pedidos registrados.</p>
+    </div>
+    <button class="btn-primary" type="button" (click)="cargarFacturas()">↻ Actualizar</button>
+  </header>
+
+  <p class="error-message" *ngIf="error">{{ error }}</p>
+  <p class="loading-message" *ngIf="cargando">Cargando comprobantes...</p>
+
+  <section class="stats-grid">
+    <article class="stat-card"><span>Total de facturas</span><strong>{{ facturas.length }}</strong></article>
+    <article class="stat-card"><span>Facturación registrada</span><strong>{{ totalFacturado | currency:'USD':'symbol':'1.2-2' }}</strong></article>
+    <article class="stat-card"><span>Resultados encontrados</span><strong>{{ facturasFiltradas.length }}</strong></article>
+  </section>
+
+  <section class="table-card">
+    <div class="table-toolbar">
+      <div><h2>Comprobantes emitidos</h2><p>Estos comprobantes se generan a partir de los pedidos existentes.</p></div>
+      <input type="search" class="search-input" placeholder="Buscar factura o cliente..." [(ngModel)]="busqueda" aria-label="Buscar facturas" />
+    </div>
+    <div class="table-responsive">
+      <table>
+        <thead><tr><th>N.º COMPROBANTE</th><th>CLIENTE</th><th>FECHA</th><th>ESTADO DEL PEDIDO</th><th class="text-right">TOTAL</th><th class="text-center">ACCIONES</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let factura of facturasFiltradas">
+            <td class="invoice-number">{{ factura.numeroFactura }}</td>
+            <td><strong>{{ factura.cliente }}</strong><small>{{ factura.identificacion || 'Sin identificación' }}</small></td>
+            <td>{{ factura.fecha | date:'dd/MM/yyyy' }}</td>
+            <td><span class="status-badge">{{ factura.estado }}</span></td>
+            <td class="text-right amount">{{ factura.total | currency:'USD':'symbol':'1.2-2' }}</td>
+            <td class="text-center"><button type="button" class="btn-action" (click)="verFactura(factura)">Ver</button><button type="button" class="btn-action" (click)="imprimirFactura(factura)">Imprimir</button></td>
+          </tr>
+          <tr *ngIf="!cargando && facturasFiltradas.length === 0"><td colspan="6" class="empty-state">No se encontraron comprobantes.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="invoice-preview" *ngIf="facturaSeleccionada">
+    <div class="preview-header">
+      <div><span class="eyebrow">COMPROBANTE DE PEDIDO</span><h2>{{ facturaSeleccionada.numeroFactura }}</h2></div>
+      <button class="btn-primary" type="button" (click)="imprimirFactura(facturaSeleccionada)">Imprimir comprobante</button>
+    </div>
+    <div class="invoice-paper" id="comprobante">
+      <div class="invoice-brand"><div><h2>TECNOMEGA</h2><p>Sistema de Gestión Comercial</p></div><div class="invoice-label"><strong>COMPROBANTE</strong><span>{{ facturaSeleccionada.numeroFactura }}</span></div></div>
+      <hr />
+      <div class="invoice-details">
+        <div><span>Cliente</span><strong>{{ facturaSeleccionada.cliente }}</strong></div>
+        <div><span>Identificación</span><strong>{{ facturaSeleccionada.identificacion || 'No registrada' }}</strong></div>
+        <div><span>Fecha</span><strong>{{ facturaSeleccionada.fecha | date:'dd/MM/yyyy' }}</strong></div>
+        <div><span>Estado</span><strong>{{ facturaSeleccionada.estado }}</strong></div>
+      </div>
+      <table class="detail-table">
+        <thead><tr><th>Producto</th><th>Cant.</th><th class="text-right">Precio</th><th class="text-right">Subtotal</th><th class="text-right">Descuento</th><th class="text-right">Total</th></tr></thead>
+        <tbody><tr *ngFor="let item of facturaSeleccionada.pedido.Items"><td>{{ item.Nombre }}</td><td>{{ item.Cantidad }}</td><td class="text-right">{{ +item.PrecioUnitario | currency:'USD':'symbol':'1.2-2' }}</td><td class="text-right">{{ +item.Subtotal | currency:'USD':'symbol':'1.2-2' }}</td><td class="text-right">{{ +item.Descuento | currency:'USD':'symbol':'1.2-2' }}</td><td class="text-right">{{ +item.Total | currency:'USD':'symbol':'1.2-2' }}</td></tr></tbody>
+      </table>
+      <div class="totals">
+        <p><span>Subtotal</span><strong>{{ +facturaSeleccionada.pedido.Subtotal | currency:'USD':'symbol':'1.2-2' }}</strong></p>
+        <p><span>Descuento</span><strong>{{ +facturaSeleccionada.pedido.Descuento | currency:'USD':'symbol':'1.2-2' }}</strong></p>
+        <p><span>IVA</span><strong>{{ +(facturaSeleccionada.pedido.IVA ?? 0) | currency:'USD':'symbol':'1.2-2' }}</strong></p>
+        <p class="grand-total"><span>Total</span><strong>{{ facturaSeleccionada.total | currency:'USD':'symbol':'1.2-2' }}</strong></p>
+      </div>
+      <p class="invoice-footer">Comprobante informativo generado a partir del pedido en TECNOMEGA. No sustituye una factura tributaria autorizada.</p>
+    </div>
+  </section>
+</div>

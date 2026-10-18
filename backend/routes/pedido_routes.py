@@ -3,7 +3,7 @@
 # ============================================================
 
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -283,25 +283,49 @@ def crear_pedido(
             subtotal_calificante = Decimal("0.00")
 
             for prod, cant, subtotal_linea in detalles_para_crear:
-                aplica = True
-                if prods_promo and prod.ProductoId not in prods_promo:
-                    aplica = False
-                if cats_promo and prod.CategoriaId not in cats_promo:
-                    aplica = False
+                # Las restricciones por producto y categoría se consideran
+                # alternativas: basta con coincidir con una de ellas.
+                aplica = (
+                    not prods_promo and not cats_promo
+                ) or (
+                    prod.ProductoId in prods_promo
+                    or prod.CategoriaId in cats_promo
+                )
                 if aplica:
                     items_calificantes.append((prod, cant, subtotal_linea))
                     subtotal_calificante += subtotal_linea
 
+            if not items_calificantes:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Este cupón no aplica a los productos de tu pedido.",
+                )
+
+            centavo = Decimal("0.01")
             if promocion_aplicada.TipoDescuento == "PORCENTAJE":
-                pct = promocion_aplicada.ValorDescuento / Decimal("100.0")
+                pct = promocion_aplicada.ValorDescuento / Decimal("100")
                 for prod, cant, subtotal_linea in items_calificantes:
-                    desc = round(subtotal_linea * pct, 2)
-                    descuentos_lineas[prod.ProductoId] = desc
+                    desc = (subtotal_linea * pct).quantize(
+                        centavo, rounding=ROUND_HALF_UP
+                    )
+                    descuentos_lineas[prod.ProductoId] = min(desc, subtotal_linea)
             elif promocion_aplicada.TipoDescuento == "MONTO_FIJO" and subtotal_calificante > 0:
-                monto_fijo = min(promocion_aplicada.ValorDescuento, subtotal_calificante)
-                for prod, cant, subtotal_linea in items_calificantes:
-                    desc = min(round((subtotal_linea / subtotal_calificante) * monto_fijo, 2), subtotal_linea)
-                    descuentos_lineas[prod.ProductoId] = desc
+                monto_fijo = min(
+                    promocion_aplicada.ValorDescuento, subtotal_calificante
+                ).quantize(centavo, rounding=ROUND_HALF_UP)
+                asignado = Decimal("0.00")
+                for indice, (prod, cant, subtotal_linea) in enumerate(items_calificantes):
+                    if indice == len(items_calificantes) - 1:
+                        desc = monto_fijo - asignado
+                    else:
+                        desc = (
+                            subtotal_linea / subtotal_calificante * monto_fijo
+                        ).quantize(centavo, rounding=ROUND_HALF_UP)
+                        desc = min(desc, subtotal_linea)
+                        asignado += desc
+                    descuentos_lineas[prod.ProductoId] = min(
+                        max(Decimal("0.00"), desc), subtotal_linea
+                    )
 
         # 6. Crear cabecera del Pedido con valores iniciales
         # El trigger TR_PedidoDetalle_ActualizarTotales recalculará automáticamente

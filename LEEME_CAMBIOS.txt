@@ -1,0 +1,29 @@
+TECNOMEGA - paquete actualizado
+================================
+
+Cambios incluidos:
+- Se añadió la pantalla de Facturación basada en los pedidos existentes.
+- Se agregó la ruta /facturas y un acceso desde el menú de cuenta de administrador.
+- Se corrigió el cálculo de descuentos de promociones al crear pedidos: se usa Decimal con redondeo monetario y se rechaza un cupón si no aplica a ningún producto.
+- Se conservaron los módulos existentes.
+
+IMPORTANTE
+- La pantalla de Facturación muestra comprobantes informativos derivados de pedidos; no genera una factura tributaria autorizada ni integra SRI.
+- El proyecto requiere configurar las credenciales de la base de datos en backend/.env. Por seguridad, el .env original no se incluye. Copia backend/.env.example a backend/.env y completa los datos de tu entorno.
+- No se incluyen node_modules ni un entorno virtual; instala las dependencias antes de ejecutar.
+
+Ejecución local (Windows, terminales separadas)
+
+Backend:
+  cd backend
+  python -m venv .venv
+  .venv\Scripts\activate
+  pip install -r requirements.txt
+  uvicorn main:app --reload
+
+Frontend:
+  cd frontend
+  npm install
+  npm start
+
+Si el punto de entrada del backend de tu instalación tiene otro nombre, utiliza el módulo que ya usabas para iniciar FastAPI.

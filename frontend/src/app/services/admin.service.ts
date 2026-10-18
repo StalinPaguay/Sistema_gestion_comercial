@@ -72,16 +72,28 @@ export interface AdminClient {
 export interface AdminPromotion {
   promocionId: number;
   nombre: string;
-  descripcion: string;
+  codigoCupon: string;
   tipo: 'Porcentaje' | 'Monto Fijo';
   valor: number; // Ej: 15 para 15% o $10
   montoMinimo?: number;
   fechaInicio: string;
   fechaFin: string;
-  prioridad: number;
   estado: boolean;
   aplicaA: 'Producto' | 'Categoria' | 'General';
-  referenciaNombre?: string;
+  productosIds: number[];
+  categoriasIds: number[];
+}
+
+export interface PromotionInput {
+  nombre: string;
+  codigoCupon?: string;
+  tipo: 'Porcentaje' | 'Monto Fijo';
+  valor: number;
+  montoMinimo?: number;
+  fechaInicio: string;
+  fechaFin: string;
+  aplicaA: 'Producto' | 'Categoria' | 'General';
+  referenciaId?: number | null;
 }
 
 export interface AdminInvoiceDetail {
@@ -245,8 +257,8 @@ export class AdminService {
         )
     );
 
-    const storedPromos = this.loadFromStorage<AdminPromotion[]>('admin_promotions');
-    this.promotions.set(storedPromos || this.getDefaultPromotions());
+    // Las promociones se cargan desde el backend (fetchPromotionsFromApi)
+    this.promotions.set([]);
 
     const storedMovements = this.loadFromStorage<InventoryMovement[]>('admin_movements');
     this.inventoryMovements.set(storedMovements || this.getDefaultMovements());
@@ -269,6 +281,7 @@ export class AdminService {
     this.fetchClientsFromApi();
     this.fetchOrdersFromApi();
     this.fetchInvoicesFromApi();
+    this.fetchPromotionsFromApi();
   }
 
   fetchProductsFromApi(): void {
@@ -669,29 +682,103 @@ export class AdminService {
   }
 
   // ==========================================
-  // PROMOCIONES Y DESCUENTOS (RF19, RF20, RF21, RF24, RF26, RF27)
+  // PROMOCIONES Y DESCUENTOS (conectado al backend)
   // ==========================================
-  addPromotion(promo: Omit<AdminPromotion, 'promocionId'>): void {
-    const current = this.promotions();
-    const newId = current.length > 0 ? Math.max(...current.map((p) => p.promocionId)) + 1 : 1;
-    const newP: AdminPromotion = { ...promo, promocionId: newId };
-    const updated = [newP, ...current];
-    this.promotions.set(updated);
-    this.saveToStorage('admin_promotions', updated);
-    this.recalculateStats();
+  fetchPromotionsFromApi(): void {
+    this.http
+      .get<any[]>(`${API_BASE_URL}/promociones?incluir_inactivas=true&limite=200`, {
+        headers: this.getAuthHeaders(),
+      })
+      .pipe(catchError(() => of(null)))
+      .subscribe((list) => {
+        // Si el backend falla, se conserva la lista actual
+        if (!Array.isArray(list)) return;
+        this.promotions.set(list.map((p) => this.mapPromotionFromApi(p)));
+        this.recalculateStats();
+      });
   }
 
-  updatePromotion(id: number, changes: Partial<AdminPromotion>): void {
-    const updated = this.promotions().map((p) => (p.promocionId === id ? { ...p, ...changes } : p));
-    this.promotions.set(updated);
-    this.saveToStorage('admin_promotions', updated);
+  private mapPromotionFromApi(p: any): AdminPromotion {
+    const productosIds: number[] = p.ProductosIds ?? [];
+    const categoriasIds: number[] = p.CategoriasIds ?? [];
+    const minimo = Number(p.MontoMinimoCompra);
+    return {
+      promocionId: p.PromocionId,
+      nombre: p.Nombre,
+      codigoCupon: p.CodigoCupon ?? '',
+      tipo: p.TipoDescuento === 'PORCENTAJE' ? 'Porcentaje' : 'Monto Fijo',
+      valor: Number(p.ValorDescuento),
+      montoMinimo: minimo > 0 ? minimo : undefined,
+      fechaInicio: (p.FechaInicio ?? '').slice(0, 10),
+      fechaFin: (p.FechaFin ?? '').slice(0, 10),
+      estado: !!p.Estado,
+      aplicaA: productosIds.length ? 'Producto' : categoriasIds.length ? 'Categoria' : 'General',
+      productosIds,
+      categoriasIds,
+    };
   }
 
-  togglePromotionStatus(id: number): void {
-    const updated = this.promotions().map((p) => (p.promocionId === id ? { ...p, estado: !p.estado } : p));
-    this.promotions.set(updated);
-    this.saveToStorage('admin_promotions', updated);
-    this.recalculateStats();
+  promoScopeLabel(p: AdminPromotion): string {
+    if (p.aplicaA === 'Producto') {
+      const names = this.products()
+        .filter((x) => p.productosIds.includes(x.productoId))
+        .map((x) => x.nombre);
+      return names.length ? `Producto (${names.join(', ')})` : 'Producto';
+    }
+    if (p.aplicaA === 'Categoria') {
+      const names = this.categories()
+        .filter((x) => p.categoriasIds.includes(x.categoriaId))
+        .map((x) => x.nombre);
+      return names.length ? `Categoría (${names.join(', ')})` : 'Categoría';
+    }
+    return 'Toda la tienda';
+  }
+
+  addPromotion(promo: PromotionInput): Observable<void> {
+    const body = {
+      Nombre: promo.nombre,
+      CodigoCupon: promo.codigoCupon ? promo.codigoCupon : null,
+      TipoDescuento: promo.tipo === 'Porcentaje' ? 'PORCENTAJE' : 'MONTO_FIJO',
+      ValorDescuento: promo.valor,
+      MontoMinimoCompra: promo.montoMinimo ?? 0,
+      FechaInicio: `${promo.fechaInicio}T00:00:00`,
+      FechaFin: `${promo.fechaFin}T23:59:59`,
+      ProductosIds: promo.aplicaA === 'Producto' && promo.referenciaId ? [promo.referenciaId] : null,
+      CategoriasIds: promo.aplicaA === 'Categoria' && promo.referenciaId ? [promo.referenciaId] : null,
+    };
+    return this.http
+      .post(`${API_BASE_URL}/promociones`, body, { headers: this.getAuthHeaders() })
+      .pipe(
+        tap(() => this.fetchPromotionsFromApi()),
+        map(() => undefined),
+      );
+  }
+
+  updatePromotion(id: number, promo: PromotionInput): Observable<void> {
+    const body = {
+      Nombre: promo.nombre,
+      CodigoCupon: promo.codigoCupon ? promo.codigoCupon : null,
+      TipoDescuento: promo.tipo === 'Porcentaje' ? 'PORCENTAJE' : 'MONTO_FIJO',
+      ValorDescuento: promo.valor,
+      MontoMinimoCompra: promo.montoMinimo ?? 0,
+      FechaInicio: `${promo.fechaInicio}T00:00:00`,
+      FechaFin: `${promo.fechaFin}T23:59:59`,
+    };
+    return this.http
+      .patch(`${API_BASE_URL}/promociones/${id}`, body, { headers: this.getAuthHeaders() })
+      .pipe(
+        tap(() => this.fetchPromotionsFromApi()),
+        map(() => undefined),
+      );
+  }
+
+  togglePromotionStatus(id: number, currentState: boolean): Observable<void> {
+    return this.http
+      .patch(`${API_BASE_URL}/promociones/${id}`, { Estado: !currentState }, { headers: this.getAuthHeaders() })
+      .pipe(
+        tap(() => this.fetchPromotionsFromApi()),
+        map(() => undefined),
+      );
   }
 
   // ==========================================
@@ -1001,50 +1088,6 @@ export class AdminService {
         estado: true,
         fechaRegistro: '2026-03-02',
         totalCompras: 899.00,
-      },
-    ];
-  }
-
-  private getDefaultPromotions(): AdminPromotion[] {
-    return [
-      {
-        promocionId: 1,
-        nombre: 'Descuento Black Cyber en Audio',
-        descripcion: '15% de descuento en todos los audífonos y sistemas de sonido',
-        tipo: 'Porcentaje',
-        valor: 15,
-        fechaInicio: '2026-10-01',
-        fechaFin: '2026-10-31',
-        prioridad: 1,
-        estado: true,
-        aplicaA: 'Categoria',
-        referenciaNombre: 'Audio',
-      },
-      {
-        promocionId: 2,
-        nombre: 'Bono Especial Primera Compra',
-        descripcion: 'Rebaja fija de $20 en compras superiores a $150',
-        tipo: 'Monto Fijo',
-        valor: 20,
-        montoMinimo: 150,
-        fechaInicio: '2026-10-10',
-        fechaFin: '2026-11-15',
-        prioridad: 2,
-        estado: true,
-        aplicaA: 'General',
-      },
-      {
-        promocionId: 3,
-        nombre: 'Super Oferta MacBook Pro',
-        descripcion: '$100 de descuento directo en MacBook Pro M3',
-        tipo: 'Monto Fijo',
-        valor: 100,
-        fechaInicio: '2026-10-05',
-        fechaFin: '2026-10-25',
-        prioridad: 1,
-        estado: true,
-        aplicaA: 'Producto',
-        referenciaNombre: 'MacBook Pro 14" M3 Pro',
       },
     ];
   }

@@ -626,3 +626,66 @@
   background: #fef2f2;
   font-size: 0.9rem;
 }
+
+/* ----- Cupones de descuento ----- */
+.coupon-box {
+  margin: 12px 0;
+  padding: 12px 0;
+  border-top: 1px dashed var(--app-border, #e2e8f0);
+  border-bottom: 1px dashed var(--app-border, #e2e8f0);
+}
+
+.coupon-box label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary, #475569);
+}
+
+.coupon-row {
+  display: flex;
+  gap: 8px;
+}
+
+.coupon-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--app-border, #dbe3ed);
+  border-radius: 8px;
+  background: var(--app-input, #fff);
+  color: var(--app-input-text, #1e293b);
+  text-transform: uppercase;
+}
+
+.coupon-row button {
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--text-accent, #0759c7);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.coupon-row button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.coupon-error {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: #dc2626;
+}
+
+.coupon-ok {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: var(--success-text, #15803d);
+}
+
+.coupon-discount {
+  color: var(--success-text, #15803d) !important;
+}

@@ -56,6 +56,7 @@ export interface PaymentMethod {
 export interface CreateOrderRequest {
   DireccionId: number;
   Items: Array<{ ProductoId: number; Cantidad: number }>;
+  CodigoCupon?: string;
 }
 
 interface OrdersResponse {

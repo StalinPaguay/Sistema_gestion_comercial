@@ -86,6 +86,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   readonly selectedProductForMovement = signal<AdminProduct | null>(null);
 
   readonly showPromotionModal = signal(false);
+  readonly editingPromotionId = signal<number | null>(null);
   readonly showSupplierModal = signal(false);
   readonly selectedInvoice = signal<AdminInvoice | null>(null);
 
@@ -134,16 +135,14 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   readonly promotionForm = new FormGroup({
     nombre: new FormControl('', [Validators.required, Validators.minLength(3)]),
-    descripcion: new FormControl('', [Validators.required]),
+    codigoCupon: new FormControl('', [Validators.maxLength(50)]),
     tipo: new FormControl<'Porcentaje' | 'Monto Fijo'>('Porcentaje', [Validators.required]),
     valor: new FormControl<number | null>(10, [Validators.required, Validators.min(0.1)]),
     montoMinimo: new FormControl<number | null>(null),
     fechaInicio: new FormControl('', [Validators.required]),
     fechaFin: new FormControl('', [Validators.required]),
-    prioridad: new FormControl<number | null>(1, [Validators.required, Validators.min(1)]),
     aplicaA: new FormControl<'Producto' | 'Categoria' | 'General'>('General', [Validators.required]),
-    referenciaNombre: new FormControl(''),
-    estado: new FormControl(true),
+    referenciaId: new FormControl<number | null>(null),
   });
 
   readonly supplierForm = new FormGroup({
@@ -414,14 +413,33 @@ export class AdminComponent implements OnInit, OnDestroy {
     const today = new Date().toISOString().split('T')[0];
     const nextMonth = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+    this.editingPromotionId.set(null);
     this.promotionForm.reset({
+      nombre: '',
+      codigoCupon: '',
       tipo: 'Porcentaje',
       valor: 10,
-      prioridad: 1,
+      montoMinimo: null,
       aplicaA: 'General',
+      referenciaId: null,
       fechaInicio: today,
       fechaFin: nextMonth,
-      estado: true,
+    });
+    this.showPromotionModal.set(true);
+  }
+
+  openEditPromotionModal(promo: AdminPromotion): void {
+    this.editingPromotionId.set(promo.promocionId);
+    this.promotionForm.reset({
+      nombre: promo.nombre,
+      codigoCupon: promo.codigoCupon,
+      tipo: promo.tipo,
+      valor: promo.valor,
+      montoMinimo: promo.montoMinimo ?? null,
+      aplicaA: promo.aplicaA,
+      referenciaId: promo.productosIds[0] ?? promo.categoriasIds[0] ?? null,
+      fechaInicio: promo.fechaInicio,
+      fechaFin: promo.fechaFin,
     });
     this.showPromotionModal.set(true);
   }
@@ -433,27 +451,58 @@ export class AdminComponent implements OnInit, OnDestroy {
     }
 
     const val = this.promotionForm.getRawValue();
-    this.adminService.addPromotion({
+    if (val.fechaFin! < val.fechaInicio!) {
+      this.showAlert('La fecha de fin no puede ser anterior a la fecha de inicio.', 'danger');
+      return;
+    }
+    if (val.aplicaA !== 'General' && !val.referenciaId) {
+      this.showAlert('Selecciona la categoría o el producto al que aplica la promoción.', 'danger');
+      return;
+    }
+
+    const input = {
       nombre: val.nombre!.trim(),
-      descripcion: val.descripcion!.trim(),
+      codigoCupon: (val.codigoCupon || '').trim().toUpperCase() || undefined,
       tipo: val.tipo!,
       valor: Number(val.valor),
       montoMinimo: val.montoMinimo ? Number(val.montoMinimo) : undefined,
       fechaInicio: val.fechaInicio!,
       fechaFin: val.fechaFin!,
-      prioridad: Number(val.prioridad),
       aplicaA: val.aplicaA!,
-      referenciaNombre: val.referenciaNombre?.trim(),
-      estado: val.estado ?? true,
-    });
+      referenciaId: val.referenciaId ? Number(val.referenciaId) : null,
+    };
 
-    this.showAlert(`Promoción "${val.nombre}" creada y activada.`);
-    this.showPromotionModal.set(false);
+    const editingId = this.editingPromotionId();
+    const request$ = editingId
+      ? this.adminService.updatePromotion(editingId, input)
+      : this.adminService.addPromotion(input);
+
+    request$.subscribe({
+      next: () => {
+        this.showAlert(
+          editingId
+            ? `Promoción "${input.nombre}" actualizada.`
+            : `Promoción "${input.nombre}" creada y activada.`,
+        );
+        this.showPromotionModal.set(false);
+        this.editingPromotionId.set(null);
+      },
+      error: (err: any) => {
+        const detail = err?.error?.detail;
+        this.showAlert(
+          typeof detail === 'string' ? detail : 'No se pudo guardar la promoción. Inténtalo de nuevo.',
+          'danger',
+        );
+      },
+    });
   }
 
   togglePromoState(promo: AdminPromotion): void {
-    this.adminService.togglePromotionStatus(promo.promocionId);
-    this.showAlert(`Promoción "${promo.nombre}" ${promo.estado ? 'desactivada' : 'activada'}.`);
+    this.adminService.togglePromotionStatus(promo.promocionId, promo.estado).subscribe({
+      next: () =>
+        this.showAlert(`Promoción "${promo.nombre}" ${promo.estado ? 'desactivada' : 'activada'}.`),
+      error: () => this.showAlert('No se pudo cambiar el estado de la promoción.', 'danger'),
+    });
   }
 
   // ==========================================

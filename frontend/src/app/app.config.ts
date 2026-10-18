@@ -1,6 +1,6 @@
 import { ApplicationConfig, inject, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { HttpInterceptorFn, provideHttpClient, withInterceptors } from '@angular/common/http';
-import { provideRouter } from '@angular/router';
+import { provideRouter, withInMemoryScrolling } from '@angular/router';
 import { routes } from './app.routes';
 import { AuthService } from './services/auth.service';
 import { API_BASE_URL } from './services/api.config';
@@ -22,6 +22,6 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideHttpClient(withInterceptors([authInterceptor])),
-    provideRouter(routes)
+    provideRouter(routes, withInMemoryScrolling({ anchorScrolling: 'enabled' })),
   ]
 };
