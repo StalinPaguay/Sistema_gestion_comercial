@@ -89,6 +89,7 @@ export const routes: Routes = [
   { path: 'perfil', pathMatch: 'full', redirectTo: 'profile' },
   { path: 'favoritos', pathMatch: 'full', redirectTo: 'favorites' },
   { path: 'historial-pedidos', pathMatch: 'full', redirectTo: 'order-history' },
+  { path: 'historial-pedidos', pathMatch: 'full', redirectTo: 'order-history' },
   { path: '', pathMatch: 'full', redirectTo: 'login' },
   { path: '**', redirectTo: 'login' },
 ];

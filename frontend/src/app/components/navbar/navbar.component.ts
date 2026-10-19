@@ -101,6 +101,20 @@ export class NavbarComponent implements OnInit {
     }
   }
 
+
+  openOrderHistory(): void {
+    this.cartMenuOpen.set(false);
+
+    if (!this.authService.accessToken()) {
+      void this.router.navigate(['/login'], {
+        queryParams: { returnUrl: '/order-history' },
+      });
+      return;
+    }
+
+    void this.router.navigate(['/order-history']);
+  }
+
   openCart(): void {
     this.cartMenuOpen.set(false);
     void this.router.navigate(['/cart']);

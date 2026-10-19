@@ -71,10 +71,7 @@ export class ProfileComponent implements OnInit {
     if (!current || form.invalid || this.savingProfile()) {
       return;
     }
-    if (current.ClienteId === null) {
-      this.errorMessage.set('No se encontró un perfil de cliente para guardar los cambios.');
-      return;
-    }
+
 
     const update: ProfileUpdate = {
       Identificacion: String(form.value['Identificacion'] ?? '').trim(),
@@ -87,11 +84,15 @@ export class ProfileComponent implements OnInit {
     this.successMessage.set('');
     this.savingProfile.set(true);
 
-    this.userService.updateProfile(current.ClienteId, update).subscribe({
+    this.userService.updateProfile(update).subscribe({
       next: (response) => {
         if (this.isProfile(response)) {
-          this.profile.set({ ...current, ...response });
-        } else {
+  this.profile.set({ ...current, ...response });
+
+  if (current.ClienteId === null) {
+    this.loadProfile();
+  }
+} else {
           this.profile.set({ ...current, ...update });
         }
         this.successMessage.set('Tus datos personales se actualizaron correctamente.');

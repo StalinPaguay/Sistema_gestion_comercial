@@ -57,20 +57,27 @@ export class Login implements OnInit {
     this.persistRememberedEmail(formValue.email.trim(), formValue.remember);
     this.isSubmitting.set(true);
     this.authService.login(credentials, formValue.remember).subscribe({
-      next: () => {
-        this.isSubmitting.set(false);
-        const user = this.authService.currentUser();
-        if (user && user.Rol === 'Administrador') {
-          void this.router.navigateByUrl('/admin');
-          return;
-        }
 
-        const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
-        const destination = returnUrl?.startsWith('/') && !returnUrl.startsWith('//')
-          ? returnUrl
-          : '/products';
-        void this.router.navigateByUrl(destination);
-      },
+next: () => {
+  this.isSubmitting.set(false);
+
+  const user = this.authService.currentUser();
+  const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+
+  const validReturnUrl =
+    returnUrl?.startsWith('/') &&
+    !returnUrl.startsWith('//') &&
+    !returnUrl.startsWith('/\\');
+
+  const destination = validReturnUrl
+    ? returnUrl!
+    : user?.Rol === 'Administrador'
+      ? '/admin'
+      : '/products';
+
+  void this.router.navigateByUrl(destination);
+},
+
       error: (error: HttpErrorResponse) => {
         const detail: unknown = error.error?.detail;
         this.feedback.set(

@@ -183,16 +183,20 @@
               <option *ngFor="let method of paymentMethods()" [value]="method.MetodoPagoId">{{ method.Nombre }}</option>
             </select>
           </label>
-          <section *ngIf="transferQrLoading() || transferQr()" class="transfer-panel" aria-live="polite">
-            <h4>Transferencia Bancaria Inmediata (Código QR)</h4>
-            <p>Escanea el código QR desde tu app bancaria móvil para transferir directamente a la cuenta oficial de TECNOMEGA.</p>
-            <div class="bank-info-box">
-              <p><strong>Banco:</strong> Banco Pichincha (Cta. Corriente: 2200192837)</p>
-              <p><strong>Beneficiario:</strong> TECNOMEGA STORE CÍA. LTDA. · RUC: 1792283918001</p>
-            </div>
-            <img *ngIf="transferQr()" [src]="transferQr()" alt="Código QR de pago para transferencia bancaria" width="200" height="200" />
-            <span *ngIf="transferQrLoading()">Generando código QR…</span>
-          </section>
+
+<section *ngIf="transferQrLoading() || transferQr()" class="transfer-panel" aria-live="polite">
+  <h4>Transferencia bancaria (demostración)</h4>
+  <p>Este código QR es únicamente demostrativo. No permite realizar un pago real.</p>
+  <img
+    *ngIf="transferQr()"
+    [src]="transferQr()"
+    alt="Código QR de demostración"
+    width="200"
+    height="200"
+  />
+  <span *ngIf="transferQrLoading()">Generando código QR de demostración…</span>
+</section>
+
           <section *ngIf="isCardPaymentSelected()" class="card-panel" aria-labelledby="card-payment-title">
             <h4 id="card-payment-title">Datos de Tarjeta de Crédito / Débito</h4>
             <p>Ingresa los datos de tu tarjeta. Procesamiento seguro conforme a estándares bancarios internacionales.</p>

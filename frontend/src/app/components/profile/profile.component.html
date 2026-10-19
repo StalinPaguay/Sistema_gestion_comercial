@@ -60,18 +60,26 @@
             <input
               name="Identificacion"
               [ngModel]="user.Identificacion ?? ''"
-              [disabled]="user.ClienteId === null"
+              aria-describedby="identificacion-help"
               required
               minlength="5"
               maxlength="20"
               autocomplete="off"
             />
+            <small id="identificacion-help">
+  Puedes editarla libremente (de 5 a 20 caracteres). Debe ser única.
+</small>
           </label>
           <label>
             <span>Tipo de cuenta</span>
             <input [value]="user.Rol" disabled />
           </label>
         </div>
+        @if (user.ClienteId === null) {
+  <p class="form-note">
+    Al guardar la identificación se creará tu perfil de cliente para habilitar compras y direcciones.
+  </p>
+}
         <button class="primary-button" type="submit" [disabled]="profileForm.invalid || savingProfile()">
           {{ savingProfile() ? 'Guardando...' : 'Guardar cambios' }}
         </button>

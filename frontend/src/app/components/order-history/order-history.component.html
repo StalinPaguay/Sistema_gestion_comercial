@@ -62,12 +62,22 @@
           </div>
           <div class="order-product-preview" [attr.aria-label]="'Productos del pedido ' + order.PedidoId">
             @for (item of order.Items; track item.PedidoDetalleId) {
-              <img
-                [src]="productImage(item.SKU)"
-                [alt]="item.Nombre"
-                [title]="item.Nombre"
-                loading="lazy"
-              />
+
+@if (productImage(item.SKU); as imageUrl) {
+  <img
+    [src]="imageUrl"
+    [alt]="item.Nombre"
+    [title]="item.Nombre"
+    loading="lazy"
+  />
+} @else {
+  <span
+    class="order-product-placeholder"
+    [attr.aria-label]="'Imagen no disponible: ' + item.Nombre"
+    [title]="item.Nombre"
+  >▧</span>
+}
+
             }
           </div>
           <button
@@ -117,12 +127,21 @@
             @for (item of detail.Items; track item.PedidoDetalleId) {
               <div class="detail-item">
                 <div class="detail-product">
-                  <img
-                    class="detail-product-image"
-                    [src]="productImage(item.SKU)"
-                    [alt]="'Imagen de ' + item.Nombre"
-                    loading="lazy"
-                  />
+
+@if (productImage(item.SKU); as imageUrl) {
+  <img
+    class="detail-product-image"
+    [src]="imageUrl"
+    [alt]="'Imagen de ' + item.Nombre"
+    loading="lazy"
+  />
+} @else {
+  <span
+    class="detail-product-placeholder"
+    aria-hidden="true"
+  >▧</span>
+}
+
                   <div class="detail-product-info">
                     <strong>{{ item.Nombre }}</strong>
                     <span>{{ item.Cantidad }} × {{ item.PrecioUnitario | currency: 'USD' }}</span>

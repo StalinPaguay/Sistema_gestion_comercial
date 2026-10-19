@@ -53,11 +53,15 @@ export interface PaymentMethod {
   Estado: boolean;
 }
 
+
 export interface CreateOrderRequest {
   DireccionId: number;
+  MetodoPagoId?: number;
+  PromocionId?: number;
   Items: Array<{ ProductoId: number; Cantidad: number }>;
   CodigoCupon?: string;
 }
+
 
 interface OrdersResponse {
   total: number;

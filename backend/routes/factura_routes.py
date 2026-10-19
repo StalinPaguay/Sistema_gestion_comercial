@@ -231,41 +231,55 @@ def obtener_factura(
 
 
 @router.get("/facturas/{factura_id}/pdf", summary="Visualizar o descargar factura en PDF")
+
 def descargar_factura_pdf(
     factura_id: int,
-    token: str | None = Query(default=None),
     db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
 ):
-    usuario = None
-    if token:
-        from services.auth_service import decodificar_token
-        try:
-            payload = decodificar_token(token)
-            usuario_id = int(payload.get("sub"))
-            usuario = db.get(Usuario, usuario_id)
-        except Exception:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de acceso inválido o expirado.")
-
+    # Buscar la factura solicitada.
     fac = db.get(Factura, factura_id)
-    if not fac:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Factura no encontrada.")
 
-    if usuario and usuario.Rol and usuario.Rol.Nombre == "Cliente":
-        cliente = db.query(Cliente).filter(Cliente.PersonaId == usuario.PersonaId).first()
-        if not cliente or fac.ClienteId != cliente.ClienteId:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado para descargar esta factura.")
+    if fac is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Factura no encontrada.",
+        )
 
+    # Solo los administradores y clientes autorizados pueden acceder.
+    if not usuario.Rol or usuario.Rol.Nombre not in {"Administrador", "Cliente"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permisos para descargar facturas.",
+        )
+
+    # Un cliente solo puede descargar sus propias facturas.
+    if usuario.Rol.Nombre == "Cliente":
+        cliente = (
+            db.query(Cliente)
+            .filter(Cliente.PersonaId == usuario.PersonaId)
+            .first()
+        )
+
+        if cliente is None or fac.ClienteId != cliente.ClienteId:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No autorizado para descargar esta factura.",
+            )
+
+    # Generar el PDF.
     pdf_bytes = generar_pdf_factura(fac, db)
-    filename = f"{fac.Numero or f'Factura-{fac.FacturaId}'}.pdf"
+    filename = f"Factura-{fac.FacturaId}.pdf"
 
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'inline; filename="{filename}"',
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-store",
         },
     )
+
 
 
 @router.post("/facturas", status_code=status.HTTP_201_CREATED, summary="Emitir factura a partir de un pedido")

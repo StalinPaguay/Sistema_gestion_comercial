@@ -233,9 +233,16 @@
               <p class="popover-empty">Tu carrito está vacío. Explora el catálogo y agrega productos.</p>
             }
           }
-          <div class="cart-popover-actions">
-            <button class="popover-footer" type="button" (click)="openCart()">Ir al carrito</button>
-          </div>
+
+<div class="cart-popover-actions">
+  <button class="popover-footer" type="button" (click)="openCart()">
+    Ir al carrito
+  </button>
+  <button class="cart-popover-secondary" type="button" (click)="openOrderHistory()">
+    Ver historial
+  </button>
+</div>
+
         </section>
       }
     </div>

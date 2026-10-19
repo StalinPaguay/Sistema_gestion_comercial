@@ -401,7 +401,7 @@ export class Cart implements OnInit {
     }
 
     this.transferQrLoading.set(true);
-    const qrData = `TECNOMEGA|BANCO_PICHINCHA|CTA_CTE_2200192837|RUC_1792283918001|MONTO_${this.totalAfterDiscount()}`;
+    const qrData = 'TECNOMEGA-DEMO|TRANSFERENCIA|NO_PAGO';
     void QRCode.toDataURL(qrData, {
       errorCorrectionLevel: 'M',
       margin: 2,
@@ -491,14 +491,17 @@ export class Cart implements OnInit {
       }
     }
 
-    const request: CreateOrderRequest = {
-      DireccionId: addressId,
-      Items: items.map((item) => ({
-        ProductoId: item.product.productoId,
-        Cantidad: item.quantity,
-      })),
-      CodigoCupon: this.appliedCoupon()?.codigo_cupon,
-    };
+
+const request: CreateOrderRequest = {
+  DireccionId: addressId,
+  MetodoPagoId: methodId,
+  Items: items.map((item) => ({
+    ProductoId: item.product.productoId,
+    Cantidad: item.quantity,
+  })),
+  CodigoCupon: this.appliedCoupon()?.codigo_cupon,
+};
+
     this.feedback = '';
     this.orderSubmitting.set(true);
     this.orderService.createOrder(request).subscribe({
