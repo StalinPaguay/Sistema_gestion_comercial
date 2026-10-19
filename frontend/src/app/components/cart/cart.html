@@ -108,7 +108,7 @@
           <strong class="coupon-discount">-{{ discount() | currency: 'USD' }}</strong>
         </div>
         <div class="summary-line">
-          <span>IVA (15%)</span>
+          <span>IVA ({{ taxService.ivaPercent() }}%)</span>
           <strong>{{ taxAfterDiscount() | currency: 'USD' }}</strong>
         </div>
         <div class="summary-line">

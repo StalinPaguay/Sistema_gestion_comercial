@@ -42,6 +42,7 @@
             required
             minlength="2"
             maxlength="100"
+            pattern=".*\S.*"
             ngModel
           />
         </label>
@@ -60,6 +61,7 @@
             required
             minlength="2"
             maxlength="100"
+            pattern=".*\S.*"
             ngModel
           />
         </label>
@@ -88,11 +90,13 @@
           </svg>
           <input
             type="tel"
+            inputmode="numeric"
             name="phone"
             placeholder="Teléfono (opcional)"
             autocomplete="tel"
             aria-label="Teléfono (opcional)"
-            maxlength="20"
+            maxlength="10"
+            pattern="[0-9]{10}"
             ngModel
           />
         </label>
@@ -190,6 +194,10 @@
           </button>
         </label>
       </div>
+
+      @if (registerForm.value.confirmPassword && registerForm.value.password !== registerForm.value.confirmPassword) {
+        <p class="form-feedback" role="alert">Las contraseñas no coinciden.</p>
+      }
 
       <button
         class="submit-button"

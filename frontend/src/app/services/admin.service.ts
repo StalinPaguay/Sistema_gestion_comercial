@@ -1,6 +1,6 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
-import { Observable, catchError, map, of, tap } from 'rxjs';
+import { Observable, catchError, forkJoin, map, of, switchMap, tap, throwError } from 'rxjs';
 import { API_BASE_URL } from './api.config';
 import { AuthService } from './auth.service';
 import { getProductImage } from './product-images.config';
@@ -17,6 +17,7 @@ export interface AdminProduct {
   categoria: string;
   categoriaId?: number;
   marca: string;
+  proveedorId?: number;
   urlImagen: string;
   estado: boolean;
   fechaCreacion?: string;
@@ -119,6 +120,7 @@ export interface AdminInvoice {
   impuesto: number; // IVA 15%
   total: number;
   estado: 'Emitida' | 'Anulada' | 'Pagada';
+  metodoPago?: string;
   detalles: AdminInvoiceDetail[];
 }
 
@@ -182,6 +184,7 @@ export class AdminService {
   readonly clients = signal<AdminClient[]>([]);
   readonly promotions = signal<AdminPromotion[]>([]);
   readonly invoices = signal<AdminInvoice[]>([]);
+  readonly invoicesLoadError = signal('');
   readonly orders = signal<AdminOrder[]>([]);
   readonly notifications = signal<OrderNotification[]>([]);
   readonly stats = signal<DashboardStats | null>(null);
@@ -222,9 +225,7 @@ export class AdminService {
             ? p.categoria
             : (p.categoriaId ? catMap.get(p.categoriaId) : null) || 'General',
         urlImagen:
-          !p.urlImagen || p.urlImagen.includes('favicon') || !p.urlImagen.startsWith('http')
-            ? getProductImage(p.sku)
-            : p.urlImagen,
+          p.urlImagen && /^https?:\/\//i.test(p.urlImagen) ? p.urlImagen : '',
       }));
       this.products.set(sanitized);
     } else {
@@ -263,8 +264,8 @@ export class AdminService {
     const storedMovements = this.loadFromStorage<InventoryMovement[]>('admin_movements');
     this.inventoryMovements.set(storedMovements || this.getDefaultMovements());
 
-    const storedInvoices = this.loadFromStorage<AdminInvoice[]>('admin_invoices');
-    this.invoices.set(storedInvoices || this.getDefaultInvoices());
+    // Las facturas son registros contables del servidor; no se completan con datos demo locales.
+    this.invoices.set([]);
 
     const storedOrders = this.loadFromStorage<AdminOrder[]>('admin_orders');
     this.orders.set(storedOrders || this.getDefaultOrders());
@@ -279,6 +280,7 @@ export class AdminService {
   refreshAllData(): void {
     this.fetchProductsFromApi();
     this.fetchCategoriesFromApi();
+    this.fetchSuppliersFromApi();
     this.fetchClientsFromApi();
     this.fetchOrdersFromApi();
     this.fetchInvoicesFromApi();
@@ -304,8 +306,30 @@ export class AdminService {
       });
   }
 
+  fetchSuppliersFromApi(): void {
+    this.http
+      .get<any>(`${API_BASE_URL}/proveedores?limite=200&desde=0`, { headers: this.getAuthHeaders() })
+      .pipe(catchError(() => of({ proveedores: [] })))
+      .subscribe((res) => {
+        if (!Array.isArray(res?.proveedores)) return;
+        const suppliers: AdminSupplier[] = res.proveedores.map((supplier: any) => ({
+          proveedorId: Number(supplier.ProveedorId),
+          identificacion: supplier.RUC ?? '',
+          nombre: supplier.NombreEmpresa ?? '',
+          contacto: supplier.Contacto ?? '',
+          telefono: supplier.Telefono ?? '',
+          correo: supplier.Email ?? '',
+          direccion: supplier.Direccion ?? '',
+          estado: supplier.Estado !== false,
+        }));
+        this.suppliers.set(suppliers);
+        this.saveToStorage('admin_suppliers', suppliers);
+        this.recalculateStats();
+      });
+  }
+
   fetchProductsFromApi(): void {
-    this.http.get<any>(`${API_BASE_URL}/productos?incluir_inactivos=true&limite=100`, { headers: this.getAuthHeaders() })
+    this.http.get<any>(`${API_BASE_URL}/productos?incluir_inactivos=true&limite=500`, { headers: this.getAuthHeaders() })
       .pipe(
         catchError(() => of({ productos: [] }))
       )
@@ -347,10 +371,7 @@ export class AdminService {
               categoria: resolvedCat,
               categoriaId: p.CategoriaId,
               marca: resolvedBrand,
-              urlImagen:
-                p.UrlImagen && p.UrlImagen.startsWith('http')
-                  ? p.UrlImagen
-                  : getProductImage(p.SKU || ''),
+              urlImagen: p.UrlImagen && /^https?:\/\//i.test(p.UrlImagen) ? p.UrlImagen : '',
               estado: p.Estado ?? true,
               fechaCreacion: new Date().toISOString().split('T')[0],
             };
@@ -495,9 +516,13 @@ export class AdminService {
 
   fetchInvoicesFromApi(): void {
     this.http
-      .get<any>(`${API_BASE_URL}/facturas?limite=100`, { headers: this.getAuthHeaders() })
-      .pipe(catchError(() => of({ facturas: [] })))
+      .get<any>(`${API_BASE_URL}/facturas?limite=200`, { headers: this.getAuthHeaders() })
+      .pipe(catchError((error: unknown) => {
+        this.invoicesLoadError.set(error instanceof Error ? error.message : 'No se pudieron cargar las facturas.');
+        return of(null);
+      }))
       .subscribe((res) => {
+        if (!res || !Array.isArray(res.facturas)) return;
         let apiInvoices: AdminInvoice[] = [];
         if (res && Array.isArray(res.facturas) && res.facturas.length > 0) {
           apiInvoices = res.facturas.map((f: any) => {
@@ -529,18 +554,14 @@ export class AdminService {
               impuesto: Number(f.Impuesto ?? f.IVA ?? 0),
               total: Number(f.Total || 0),
               estado: f.Estado || 'Emitida',
+              metodoPago: [...new Set((f.Pagos ?? []).filter((p: any) => p.MetodoPago).map((p: any) => `${p.MetodoPago} (${p.Estado || 'Pendiente'})`))].join(', ') || 'Sin pago registrado',
               detalles,
             };
           });
         }
 
-        const defaultInvoices = this.getDefaultInvoices();
-        const apiIds = new Set(apiInvoices.map((inv) => inv.facturaId));
-        const preservedDefaults = defaultInvoices.filter((d) => !apiIds.has(d.facturaId));
-
-        const combined = [...apiInvoices, ...preservedDefaults];
-        this.invoices.set(combined);
-        this.saveToStorage('admin_invoices', combined);
+        this.invoicesLoadError.set('');
+        this.invoices.set(apiInvoices);
         this.recalculateStats();
       });
   }
@@ -548,36 +569,80 @@ export class AdminService {
   // ==========================================
   // PRODUCTOS (RF05, RF06, RF07, RF09)
   // ==========================================
-  addProduct(productData: Omit<AdminProduct, 'productoId'>): void {
-    const current = this.products();
-    const newId = current.length > 0 ? Math.max(...current.map((p) => p.productoId)) + 1 : 1;
-    const newProduct: AdminProduct = {
-      ...productData,
-      productoId: newId,
-      fechaCreacion: new Date().toISOString().split('T')[0],
-    };
+  addProduct(productData: Omit<AdminProduct, 'productoId'> & { urlImagen: string; proveedorId: number }): Observable<AdminProduct> {
+    const headers = this.getAuthHeaders();
+    const normalize = (value: string) => value.trim().toLocaleLowerCase();
 
-    const updated = [newProduct, ...current];
-    this.products.set(updated);
-    this.saveToStorage('admin_products', updated);
+    return forkJoin({
+      categories: this.http.get<any>(`${API_BASE_URL}/categorias?limite=500&desde=0&incluir_inactivas=true`, { headers }),
+      brands: this.http.get<any>(`${API_BASE_URL}/marcas?limite=500&desde=0&incluir_inactivas=true`, { headers }),
+    }).pipe(
+      switchMap(({ categories, brands }) => {
+        const category = (categories?.categorias ?? []).find(
+          (item: any) => normalize(item.Nombre ?? '') === normalize(productData.categoria),
+        );
+        if (!category) {
+          return throwError(() => new Error(`La categoría "${productData.categoria}" no existe en la base de datos.`));
+        }
 
-    // Registrar movimiento de inventario inicial por entrada
-    if (newProduct.stock > 0) {
-      this.registerMovement({
-        productoId: newId,
-        productoNombre: newProduct.nombre,
-        tipoMovimiento: 'Entrada',
-        cantidad: newProduct.stock,
-        usuarioResponsable: this.authService.currentUser()?.Nombres || 'Administrador',
-        motivo: 'Inventario Inicial',
-        observacion: 'Carga inicial al registrar producto',
-      });
-    }
+        const existingBrand = (brands?.marcas ?? []).find(
+          (item: any) => normalize(item.Nombre ?? '') === normalize(productData.marca),
+        );
+        const brandRequest = existingBrand
+          ? of(existingBrand)
+          : this.http.post<any>(`${API_BASE_URL}/marcas`, { Nombre: productData.marca.trim(), Estado: true }, { headers });
 
-    this.recalculateStats();
+        return brandRequest.pipe(
+          switchMap((brand: any) =>
+            this.http.post<any>(
+              `${API_BASE_URL}/productos`,
+              {
+                CategoriaId: category.CategoriaId,
+                MarcaId: brand.MarcaId,
+                SKU: productData.sku,
+                Nombre: productData.nombre,
+                Descripcion: productData.descripcion || null,
+                Precio: productData.precio,
+                Stock: productData.stock,
+                StockMinimo: productData.stockMinimo,
+                Estado: productData.estado,
+                UrlImagen: productData.urlImagen,
+                ProveedorId: productData.proveedorId,
+              },
+              { headers },
+            ),
+          ),
+        );
+      }),
+      map((saved: any): AdminProduct => ({
+        productoId: saved.ProductoId,
+        sku: saved.SKU,
+        nombre: saved.Nombre,
+        descripcion: saved.Descripcion ?? '',
+        precio: Number(saved.Precio),
+        stock: Number(saved.Stock),
+        stockMinimo: Number(saved.StockMinimo),
+        categoria: saved.Categoria ?? productData.categoria,
+        categoriaId: saved.CategoriaId,
+        marca: saved.Marca ?? productData.marca,
+        urlImagen: saved.UrlImagen ?? productData.urlImagen ?? getProductImage(saved.SKU),
+        proveedorId: saved.ProveedorId ?? productData.proveedorId,
+        estado: saved.Estado !== false,
+        fechaCreacion: new Date().toISOString().split('T')[0],
+      })),
+      tap((created) => {
+        const updated = [created, ...this.products().filter((product) => product.productoId !== created.productoId)];
+        this.products.set(updated);
+        this.saveToStorage('admin_products', updated);
+        this.recalculateStats();
+        // La API es la fuente del catálogo; volver a leerla sincroniza sus datos canónicos.
+        this.fetchProductsFromApi();
+      }),
+    );
   }
 
-  updateProduct(id: number, changes: Partial<AdminProduct>): void {
+  updateProduct(id: number, changes: Partial<AdminProduct>): Observable<any> {
+    const previous = this.products().find((product) => product.productoId === id);
     const updated = this.products().map((p) => (p.productoId === id ? { ...p, ...changes } : p));
     this.products.set(updated);
     this.saveToStorage('admin_products', updated);
@@ -591,20 +656,40 @@ export class AdminService {
     if (changes.nombre !== undefined) payload.Nombre = changes.nombre;
     if (changes.descripcion !== undefined) payload.Descripcion = changes.descripcion;
     if (changes.estado !== undefined) payload.Estado = changes.estado;
+    if (changes.urlImagen !== undefined) payload.UrlImagen = changes.urlImagen;
 
-    if (Object.keys(payload).length > 0) {
-      this.http
-        .patch(`${API_BASE_URL}/productos/${id}`, payload, { headers: this.getAuthHeaders() })
-        .pipe(catchError(() => of(null)))
-        .subscribe((res: any) => {
-          if (res && res.Stock !== undefined) {
-            const syncd = this.products().map((p) => (p.productoId === id ? { ...p, stock: res.Stock } : p));
-            this.products.set(syncd);
-            this.saveToStorage('admin_products', syncd);
+    if (Object.keys(payload).length === 0) return of(null);
+
+    return this.http
+      .patch(`${API_BASE_URL}/productos/${id}`, payload, { headers: this.getAuthHeaders() })
+      .pipe(
+        tap((res: any) => {
+          const syncd = this.products().map((p) => (p.productoId === id
+            ? {
+                ...p,
+                stock: res.Stock ?? p.stock,
+                stockMinimo: res.StockMinimo ?? p.stockMinimo,
+                precio: res.Precio !== undefined ? Number(res.Precio) : p.precio,
+                nombre: res.Nombre ?? p.nombre,
+                descripcion: res.Descripcion ?? p.descripcion,
+                estado: res.Estado ?? p.estado,
+                urlImagen: res.UrlImagen ?? p.urlImagen,
+              }
+            : p));
+          this.products.set(syncd);
+          this.saveToStorage('admin_products', syncd);
+          this.recalculateStats();
+        }),
+        catchError((error) => {
+          if (previous) {
+            const reverted = this.products().map((product) => product.productoId === id ? previous : product);
+            this.products.set(reverted);
+            this.saveToStorage('admin_products', reverted);
             this.recalculateStats();
           }
-        });
-    }
+          return throwError(() => error);
+        }),
+      );
   }
 
   toggleProductStatus(id: number): void {
@@ -698,7 +783,7 @@ export class AdminService {
     }
 
     if (prod) {
-      this.updateProduct(prod.productoId, { stock: nuevoStock });
+      this.updateProduct(prod.productoId, { stock: nuevoStock }).subscribe({ error: () => undefined });
     }
 
     const newMov: InventoryMovement = {

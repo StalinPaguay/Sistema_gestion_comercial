@@ -3,6 +3,7 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { Observable, concatMap, from, last, of, switchMap, tap } from 'rxjs';
 import { API_BASE_URL } from './api.config';
 import { getProductImage, Product } from './product.service';
+import { TaxService } from './tax.service';
 
 export interface CartItem {
   product: Product;
@@ -42,6 +43,7 @@ export interface UpdateCartItemRequest {
 @Injectable({ providedIn: 'root' })
 export class CartService {
   private readonly http = inject(HttpClient);
+  private readonly taxService = inject(TaxService);
   private readonly storageKey = 'tecnomega_cart_v1';
   readonly items = signal<CartItem[]>(this.loadItems());
   readonly count = computed(() =>
@@ -50,7 +52,7 @@ export class CartService {
   readonly subtotal = computed(() =>
     this.items().reduce((total, item) => total + item.product.precio * item.quantity, 0),
   );
-  readonly tax = computed(() => Math.round((this.subtotal() * 0.15 + Number.EPSILON) * 100) / 100);
+  readonly tax = computed(() => Math.round((this.subtotal() * this.taxService.ivaPercent() / 100 + Number.EPSILON) * 100) / 100);
   readonly shipping = computed(() => 0);
   readonly total = computed(() => this.subtotal() + this.tax() + this.shipping());
 

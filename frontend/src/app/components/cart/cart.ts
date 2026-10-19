@@ -20,6 +20,7 @@ import { CouponValidation, PromotionService } from '../../services/promotion.ser
 import { Product, ProductService } from '../../services/product.service';
 import { CreateOrderRequest, CustomerOrder, OrderService, PaymentMethod } from '../../services/order.service';
 import { DeliveryAddress, DeliveryAddressInput, UserService } from '../../services/user.service';
+import { TaxService } from '../../services/tax.service';
 
 @Component({
   imports: [CurrencyPipe, NgFor, NgIf, RouterLink],
@@ -35,6 +36,7 @@ export class Cart implements OnInit {
   private readonly orderService = inject(OrderService);
   private readonly router = inject(Router);
   private readonly promotionService = inject(PromotionService);
+  protected readonly taxService = inject(TaxService);
   @ViewChild('cardForm') private cardForm?: ElementRef<HTMLFormElement>;
   protected recommendedProducts: Product[] = [];
   protected feedback = '';
@@ -69,7 +71,7 @@ export class Cart implements OnInit {
   protected readonly couponError = signal('');
   protected readonly discount = computed(() => Number(this.appliedCoupon()?.monto_descuento ?? 0));
   protected readonly taxAfterDiscount = computed(
-    () => Math.round(((this.cartService.subtotal() - this.discount()) * 0.15 + Number.EPSILON) * 100) / 100,
+    () => Math.round(((this.cartService.subtotal() - this.discount()) * this.taxService.ivaPercent() / 100 + Number.EPSILON) * 100) / 100,
   );
   protected readonly totalAfterDiscount = computed(
     () =>
@@ -93,6 +95,7 @@ export class Cart implements OnInit {
   }
 
   ngOnInit(): void {
+    this.taxService.load().subscribe({ error: () => undefined });
     this.productService.getProducts().subscribe({
       next: (result) => {
         this.recommendedProducts = result.data.slice(0, 3);
@@ -356,6 +359,8 @@ export class Cart implements OnInit {
     const digitsCard = (numeroInput?.value || '').replace(/\D/g, '');
     if (digitsCard.length !== 16) {
       errors.push(`Número de tarjeta (${digitsCard.length}/16 dígitos ingresados)`);
+    } else if (!this.passesLuhnCheck(digitsCard)) {
+      errors.push('Número de tarjeta no válido (revisa los dígitos ingresados)');
     }
 
     // 3. Vencimiento MM/AA
@@ -387,6 +392,21 @@ export class Cart implements OnInit {
       this.feedback = '';
     }
     return valid;
+  }
+
+  private passesLuhnCheck(digits: string): boolean {
+    let sum = 0;
+    let doubleDigit = false;
+    for (let index = digits.length - 1; index >= 0; index -= 1) {
+      let digit = Number(digits[index]);
+      if (doubleDigit) {
+        digit *= 2;
+        if (digit > 9) digit -= 9;
+      }
+      sum += digit;
+      doubleDigit = !doubleDigit;
+    }
+    return sum % 10 === 0;
   }
 
   private updateTransferQr(): void {

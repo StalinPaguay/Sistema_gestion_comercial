@@ -24,7 +24,8 @@ from models.promocion import Promocion
 from models.promocion_categoria import PromocionCategoria
 from models.promocion_producto import PromocionProducto
 from models.usuario import Usuario
-from services.auth_service import get_current_user
+from services.auth_service import get_current_user, require_admin
+from services.parametro_service import obtener_porcentaje_iva
 
 router = APIRouter(
     prefix="/pedidos",
@@ -327,8 +328,24 @@ def crear_pedido(
                         max(Decimal("0.00"), desc), subtotal_linea
                     )
 
-        # 6. Crear cabecera del Pedido con valores iniciales
-        # El trigger TR_PedidoDetalle_ActualizarTotales recalculará automáticamente
+        # 6. Calcular impuestos en el backend para no depender de un trigger SQL
+        # que puede no existir en todas las instalaciones del proyecto.
+        try:
+            iva_porcentaje = obtener_porcentaje_iva(db)
+        except Exception as error:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="No se pudo leer el parámetro de IVA desde la base de datos.",
+            ) from error
+
+        descuento_calculado = sum(descuentos_lineas.values(), Decimal("0.00"))
+        base_imponible = max(Decimal("0.00"), subtotal_calculado - descuento_calculado)
+        iva_calculado = (base_imponible * iva_porcentaje / Decimal("100")).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        total_calculado = base_imponible + iva_calculado
+
+        # 7. Crear cabecera del pedido con los importes calculados.
         pedido = Pedido(
             UsuarioId=usuario.UsuarioId,
             ClienteId=cliente.ClienteId,
@@ -336,15 +353,15 @@ def crear_pedido(
             PromocionId=promocion_aplicada.PromocionId if promocion_aplicada else None,
             FechaPedido=datetime.now(),
             Subtotal=subtotal_calculado,
-            Descuento=Decimal("0.00"),
-            IVA=Decimal("0.00"),
-            Total=subtotal_calculado,
+            Descuento=descuento_calculado,
+            IVA=iva_calculado,
+            Total=total_calculado,
             Estado="Pendiente",
         )
         db.add(pedido)
         db.flush()
 
-        # 7. Crear detalles del pedido con sus descuentos
+        # 8. Crear detalles del pedido con sus descuentos.
         for prod, cant, subtotal_linea in detalles_para_crear:
             desc_linea = descuentos_lineas.get(prod.ProductoId, Decimal("0.00"))
             total_linea = max(Decimal("0.00"), subtotal_linea - desc_linea)
@@ -361,7 +378,8 @@ def crear_pedido(
 
         db.flush()
 
-        # El trigger de SQL Server actualiza los importes del pedido al insertar los detalles.
+        # Los triggers existentes pueden recalcular los mismos importes; el backend
+        # ya los guarda explícitamente para esquemas que no incluyen esos triggers.
         db.refresh(pedido)
 
         # Guardar la selección como pago pendiente; no se afirma que haya ocurrido un cobro.
@@ -373,6 +391,17 @@ def crear_pedido(
                 Monto=pedido.Total,
                 Estado="Pendiente",
             ))
+
+        # Registrar la factura junto con la compra para que aparezca de inmediato
+        # en el módulo administrativo. La factura permanece Emitida hasta confirmar
+        # el pago; no se confunde la creación del pedido con un cobro realizado.
+        from routes.factura_routes import emitir_factura_logica
+        factura = emitir_factura_logica(pedido, usuario.UsuarioId, db)
+        if factura is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="No se pudo generar la factura para el pedido.",
+            )
 
         # Retirar del carrito únicamente los productos que se acaban de pedir.
         carrito = db.query(Carrito).filter(Carrito.ClienteId == cliente.ClienteId).first()
@@ -405,7 +434,7 @@ def actualizar_estado(
     pedido_id: int,
     datos: ActualizarEstadoPedido,
     db: Session = Depends(get_db),
-    _user: Any = Depends(get_current_user),
+    _user: Any = Depends(require_admin),
 ):
     pedido = db.get(Pedido, pedido_id)
     if not pedido:

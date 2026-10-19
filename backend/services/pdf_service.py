@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Any
 from models.factura import Factura
 from models.detalle_factura import DetalleFactura
+from models.pago import Pago
 from sqlalchemy.orm import Session
 
 
@@ -43,6 +44,12 @@ def generar_pdf_factura(fac: Factura, db: Session) -> bytes:
     descuento = float(fac.Descuento or 0.0)
     impuesto = float(fac.Impuesto or 0.0)
     total = float(fac.Total or 0.0)
+    taxable_base = max(0.0, subtotal - descuento)
+    tax_percent = (impuesto / taxable_base * 100) if taxable_base > 0 else 0.0
+    payments = db.query(Pago).filter(Pago.PedidoId == fac.PedidoId).all() if fac.PedidoId else []
+    payment_method = ", ".join(
+        sorted({f"{p.MetodoPago.Nombre} ({p.Estado})" for p in payments if p.MetodoPago})
+    ) or "Sin pago registrado"
 
     stream: list[str] = []
 
@@ -73,6 +80,8 @@ def generar_pdf_factura(fac: Factura, db: Session) -> bytes:
 
     stream.append("BT /F2 9 Tf 380 725 Td (ESTADO:) Tj ET")
     stream.append(f"BT /F2 9 Tf 430 725 Td ({_escape_pdf_str(estado)}) Tj ET")
+    stream.append("BT /F2 8 Tf 380 690 Td (FORMA DE PAGO:) Tj ET")
+    stream.append(f"BT /F1 8 Tf 450 690 Td ({_escape_pdf_str(payment_method)[:18]}) Tj ET")
 
     # 3. Encabezado de la tabla de detalles
     y = 650
@@ -118,7 +127,7 @@ def generar_pdf_factura(fac: Factura, db: Session) -> bytes:
     stream.append(f"BT /F1 9 Tf 350 {y-30} Td (DESCUENTO:) Tj ET")
     stream.append(f"BT /F2 9 Tf 475 {y-30} Td (-${descuento:.2f}) Tj ET")
 
-    stream.append(f"BT /F1 9 Tf 350 {y-45} Td (IVA (15%):) Tj ET")
+    stream.append(f"BT /F1 9 Tf 350 {y-45} Td (IVA ({tax_percent:.2f}%):) Tj ET")
     stream.append(f"BT /F2 9 Tf 475 {y-45} Td (${impuesto:.2f}) Tj ET")
 
     stream.append("0.09 0.23 0.44 rg")

@@ -32,7 +32,8 @@ class ImagenProducto(Base):
 
     # Relación con el modelo de productos
     Producto: Mapped["Producto"] = relationship(
-        "Producto"
+        "Producto",
+        back_populates="Imagenes",
     )
 
     # URL de la imagen

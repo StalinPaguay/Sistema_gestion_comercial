@@ -125,6 +125,11 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           <span>Facturación</span>
         </button>
+
+        <button class="nav-item" [class.active]="currentTab() === 'settings'" (click)="setTab('settings')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 2.94-.08-.02a1.7 1.7 0 0 0-1.76.48l-.06.06h-3.4l-.06-.08a1.7 1.7 0 0 0-1.76-.48l-.08.02-1.7-2.94.06-.06A1.7 1.7 0 0 0 9.6 15l-.08-.05v-3.4l.08-.05a1.7 1.7 0 0 0-.34-1.88L9.2 9.56l1.7-2.94.08.02a1.7 1.7 0 0 0 1.76-.48l.06-.06h3.4l.06.08a1.7 1.7 0 0 0 1.76.48l.08-.02 1.7 2.94-.06.06A1.7 1.7 0 0 0 19.4 11.5l.08.05v3.4z"/></svg>
+          <span>IVA y parámetros</span>
+        </button>
       </nav>
     </aside>
 
@@ -798,7 +803,8 @@
                   <th>Cédula / RUC</th>
                   <th>Subtotal</th>
                   <th>Descuento</th>
-                  <th>IVA (15%)</th>
+                  <th>IVA aplicado</th>
+                  <th>Método de pago</th>
                   <th>Total</th>
                   <th>Estado</th>
                   <th class="text-right">Detalle</th>
@@ -813,7 +819,8 @@
                     <td><code>{{ inv.clienteIdentificacion }}</code></td>
                     <td>{{ inv.subtotal | currency:'USD' }}</td>
                     <td class="text-success">-{{ inv.descuento | currency:'USD' }}</td>
-                    <td>{{ inv.impuesto | currency:'USD' }}</td>
+                    <td>{{ inv.impuesto | currency:'USD' }} <small>({{ invoiceTaxPercent(inv) }}%)</small></td>
+                    <td>{{ inv.metodoPago || 'Sin pago registrado' }}</td>
                     <td><strong class="total-highlight">{{ inv.total | currency:'USD' }}</strong></td>
                     <td><span class="badge badge-success">{{ inv.estado }}</span></td>
                     <td class="text-right">
@@ -822,8 +829,44 @@
                     </td>
                   </tr>
                 }
+                @if (!adminService.invoices().length) {
+                  <tr><td colspan="11" class="text-center">{{ adminService.invoicesLoadError() || 'No hay facturas emitidas.' }}</td></tr>
+                }
               </tbody>
             </table>
+          </div>
+        </section>
+      }
+
+      @if (currentTab() === 'settings') {
+        <section class="tab-panel">
+          <div class="panel-header">
+            <div>
+              <h1 class="panel-title">Parámetros comerciales</h1>
+              <p class="panel-subtitle">Configura el IVA aplicado a nuevos pedidos y facturas.</p>
+            </div>
+            <button class="btn btn-outline" type="button" (click)="loadTaxParameter()" [disabled]="taxLoading()">Actualizar</button>
+          </div>
+
+          <div class="data-table-container tax-settings-card">
+            <h2>Impuesto al valor agregado (IVA)</h2>
+            <p>El porcentaje se guarda en la base de datos. Los pedidos y facturas anteriores conservan sus valores registrados.</p>
+            @if (taxLoadError()) {
+              <p class="text-danger" role="alert">{{ taxLoadError() }}</p>
+            }
+            <form [formGroup]="taxForm" (ngSubmit)="saveTaxParameter()">
+              <label for="tax-percent">Porcentaje de IVA</label>
+              <div class="tax-input-row">
+                <input id="tax-percent" type="number" min="0" max="100" step="0.01" formControlName="porcentaje" [readonly]="!!taxLoadError() || taxLoading()" />
+                <span>%</span>
+              </div>
+              @if (taxForm.controls.porcentaje.touched && taxForm.controls.porcentaje.invalid) {
+                <small class="text-danger">Ingresa un porcentaje entre 0 y 100.</small>
+              }
+              <button class="btn btn-primary" type="submit" [disabled]="taxForm.invalid || taxLoading() || taxSaving() || !!taxLoadError()">
+                {{ taxSaving() ? 'Guardando…' : 'Guardar IVA' }}
+              </button>
+            </form>
           </div>
         </section>
       }
@@ -847,7 +890,7 @@
             <div class="form-row">
               <div class="form-group">
                 <label>SKU / Código:</label>
-                <input type="text" formControlName="sku" placeholder="Ej: PRD-1029" />
+                <input type="text" formControlName="sku" placeholder="Generado automáticamente" readonly />
               </div>
               <div class="form-group">
                 <label>Marca:</label>
@@ -868,7 +911,7 @@
             <div class="form-row">
               <div class="form-group">
                 <label>Precio Unitario ($):</label>
-                <input type="number" step="0.01" formControlName="precio" placeholder="0.00" />
+                <input type="number" min="0.01" step="0.01" formControlName="precio" placeholder="0.00" />
               </div>
               <div class="form-group">
                 <label>Categoría:</label>
@@ -883,23 +926,40 @@
             <div class="form-row">
               <div class="form-group">
                 <label>Stock Inicial:</label>
-                <input type="number" formControlName="stock" />
+                <input type="number" min="0" step="1" formControlName="stock" />
               </div>
               <div class="form-group">
                 <label>Stock Mínimo (Alerta):</label>
-                <input type="number" formControlName="stockMinimo" />
+                <input type="number" min="0" step="1" formControlName="stockMinimo" />
               </div>
             </div>
 
             <div class="form-group">
               <label>URL de Imagen:</label>
-              <input type="text" formControlName="urlImagen" placeholder="https://..." />
+              <input type="url" formControlName="urlImagen" placeholder="Pega la URL pública de la imagen (https://...)" />
             </div>
+
+            @if (!editingProduct()) {
+              <div class="form-group">
+                <label>Proveedor:</label>
+                <select formControlName="proveedorId">
+                  <option [ngValue]="null" disabled>Selecciona un proveedor</option>
+                  @for (supplier of adminService.suppliers(); track supplier.proveedorId) {
+                    <option [ngValue]="supplier.proveedorId">{{ supplier.nombre }}</option>
+                  }
+                </select>
+                @if (adminService.suppliers().length === 0) {
+                  <small>No hay proveedores activos. Registra un proveedor antes de crear el producto.</small>
+                }
+              </div>
+            }
           </div>
 
           <footer class="modal-footer">
             <button type="button" class="btn btn-secondary" (click)="showProductModal.set(false)">Cancelar</button>
-            <button type="submit" class="btn btn-primary" [disabled]="productForm.invalid">Guardar Producto</button>
+            <button type="submit" class="btn btn-primary" [disabled]="productForm.invalid || savingProduct()">
+              {{ savingProduct() ? 'Guardando...' : 'Guardar Producto' }}
+            </button>
           </footer>
         </form>
       </div>
@@ -1037,14 +1097,14 @@
               </div>
               <div class="form-group">
                 <label>Valor de Descuento:</label>
-                <input type="number" step="0.1" formControlName="valor" placeholder="Ej: 15 para 15% o $10" />
+                <input type="number" min="0.1" [attr.max]="promotionForm.controls.tipo.value === 'Porcentaje' ? 100 : null" step="0.1" formControlName="valor" placeholder="Ej: 15 para 15% o $10" />
               </div>
             </div>
 
             <div class="form-row">
               <div class="form-group">
                 <label>Monto Mínimo de Compra (Opcional):</label>
-                <input type="number" formControlName="montoMinimo" placeholder="Opcional ($)" />
+                <input type="number" min="0" step="0.01" formControlName="montoMinimo" placeholder="Opcional ($)" />
               </div>
               <div class="form-group">
                 <label>Aplica a:</label>
@@ -1131,7 +1191,7 @@
             <div class="form-row">
               <div class="form-group">
                 <label>Teléfono:</label>
-                <input type="text" formControlName="telefono" />
+                <input type="tel" inputmode="numeric" maxlength="10" pattern="[0-9]{10}" formControlName="telefono" />
               </div>
               <div class="form-group">
                 <label>Correo Electrónico:</label>
@@ -1216,7 +1276,7 @@
               <strong>-{{ selectedInvoice()?.descuento | currency:'USD' }}</strong>
             </div>
             <div class="summary-line">
-              <span>IVA (15%):</span>
+              <span>IVA ({{ invoiceTaxPercent(selectedInvoice()!) }}%):</span>
               <strong>{{ selectedInvoice()?.impuesto | currency:'USD' }}</strong>
             </div>
             <div class="summary-line grand-total">

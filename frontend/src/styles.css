@@ -335,6 +335,16 @@ app-products .empty-state-reset:focus-visible {
   outline-offset: 3px;
 }
 
+.admin-wrapper .tax-settings-card { max-width: 720px; padding: 28px; }
+.admin-wrapper .tax-settings-card h2 { margin: 0 0 8px; }
+.admin-wrapper .tax-settings-card > p { margin-bottom: 22px; color: #64748b; }
+.admin-wrapper .tax-settings-card form { display: grid; justify-items: start; gap: 10px; max-width: 360px; }
+.admin-wrapper .tax-settings-card form label { font-weight: 650; }
+.admin-wrapper .tax-input-row { display: flex; align-items: center; gap: 10px; width: 100%; }
+.admin-wrapper .tax-input-row input { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; }
+.admin-wrapper.dark-theme .tax-settings-card > p { color: #cbd5e1; }
+.admin-wrapper.dark-theme .tax-input-row input { color: #f8fafc; background: #0f172a; border-color: #334155; }
+
 @media (prefers-reduced-motion: reduce) {
   body {
     transition: none;

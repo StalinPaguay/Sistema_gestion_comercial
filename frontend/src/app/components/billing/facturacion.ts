@@ -1,11 +1,12 @@
 import { CurrencyPipe, DatePipe, NgFor, NgIf } from '@angular/common';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { Component, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { catchError, of } from 'rxjs';
 import { API_BASE_URL } from '../../services/api.config';
 import { AuthService } from '../../services/auth.service';
-import { CustomerOrder, OrderService } from '../../services/order.service';
+import { CustomerOrder, OrderPayment } from '../../services/order.service';
+import { TaxService } from '../../services/tax.service';
 
 interface InvoiceRow {
   facturaId?: number;
@@ -15,6 +16,7 @@ interface InvoiceRow {
   fecha: string | null;
   estado: string;
   total: number;
+  metodoPago: string;
   pedido: CustomerOrder;
 }
 
@@ -28,7 +30,7 @@ interface InvoiceRow {
 export class Facturacion implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly authService = inject(AuthService);
-  private readonly orderService = inject(OrderService);
+  protected readonly taxService = inject(TaxService);
 
   facturas: InvoiceRow[] = [];
   facturaSeleccionada: InvoiceRow | null = null;
@@ -46,7 +48,15 @@ export class Facturacion implements OnInit {
   }
 
   get totalFacturado(): number {
-    return this.facturas.reduce((sum, f) => sum + f.total, 0);
+    return this.facturas.reduce((sum, f) => sum + (f.estado !== 'Anulada' ? f.total : 0), 0);
+  }
+
+  impuestoPorcentaje(invoice: InvoiceRow): string {
+    const taxableBase = Math.max(0, Number(invoice.pedido.Subtotal) - Number(invoice.pedido.Descuento));
+    const tax = Number(invoice.pedido.IVA ?? 0);
+    return taxableBase > 0
+      ? ((tax / taxableBase) * 100).toFixed(2)
+      : this.taxService.ivaPercent().toFixed(2);
   }
 
   ngOnInit(): void {
@@ -67,12 +77,18 @@ export class Facturacion implements OnInit {
     this.cargando = true;
     this.error = '';
 
+    this.taxService.load().pipe(catchError(() => of(null))).subscribe();
     this.http
-      .get<any>(`${API_BASE_URL}/facturas?limite=100`, { headers: this.getAuthHeaders() })
-      .pipe(catchError(() => of({ facturas: [] })))
+      .get<any>(`${API_BASE_URL}/facturas?limite=200`, { headers: this.getAuthHeaders() })
+      .pipe(catchError((error: unknown) => {
+        this.error = error instanceof HttpErrorResponse
+          ? (typeof error.error?.detail === 'string' ? error.error.detail : 'No se pudieron cargar las facturas.')
+          : 'No se pudieron cargar las facturas.';
+        return of(null);
+      }))
       .subscribe({
         next: (res) => {
-          if (res && Array.isArray(res.facturas) && res.facturas.length > 0) {
+          if (res && Array.isArray(res.facturas)) {
             this.facturas = res.facturas.map((f: any) => {
               const rawItems = Array.isArray(f.Items) ? f.Items : (Array.isArray(f.detalles) ? f.detalles : []);
               const mappedItems = rawItems.map((it: any) => ({
@@ -91,6 +107,15 @@ export class Facturacion implements OnInit {
               const descuento = Number(f.Descuento || 0);
               const iva = Number(f.Impuesto ?? f.IVA ?? 0);
               const total = Number(f.Total || 0);
+              const payments: OrderPayment[] = (Array.isArray(f.Pagos) ? f.Pagos : []).map((p: any) => ({
+                PagoId: Number(p.PagoId),
+                MetodoPagoId: Number(p.MetodoPagoId),
+                MetodoPago: p.MetodoPago || null,
+                FechaPago: p.FechaPago || null,
+                Monto: String(p.Monto ?? '0'),
+                Estado: p.Estado || 'Pendiente',
+                TransaccionId: p.TransaccionId || null,
+              }));
               const clienteNombre = f.Cliente
                 ? `${f.Cliente.Nombres || ''} ${f.Cliente.Apellidos || ''}`.trim()
                 : 'Cliente';
@@ -105,7 +130,7 @@ export class Facturacion implements OnInit {
                 Total: String(total),
                 Estado: f.Estado || 'Emitida',
                 Items: mappedItems,
-                Pagos: [],
+                Pagos: payments,
               };
 
               return {
@@ -116,48 +141,16 @@ export class Facturacion implements OnInit {
                 fecha: f.Fecha || f.FechaEmision,
                 estado: f.Estado || 'Emitida',
                 total,
+                metodoPago: [...new Set(payments.filter((p) => p.MetodoPago).map((p) => `${p.MetodoPago} (${p.Estado})`))].join(', ') || 'Sin pago registrado',
                 pedido: dummyOrder,
               };
             });
-            this.cargando = false;
           } else {
-            // Fallback a pedidos en caso de no haber facturas emitidas aún
-            this.cargarDesdePedidos();
+            this.facturas = [];
           }
-        },
-        error: () => {
-          this.cargarDesdePedidos();
+          this.cargando = false;
         },
       });
-  }
-
-  private cargarDesdePedidos(): void {
-    this.orderService.getOrders(200).subscribe({
-      next: (orders) => {
-        this.facturas = orders.map((order) => {
-          const raw = order as CustomerOrder & {
-            Cliente?: { Identificacion?: string; Nombres?: string; Apellidos?: string };
-            ClienteId?: number;
-          };
-          const nombre = [raw.Cliente?.Nombres, raw.Cliente?.Apellidos]
-            .filter(Boolean).join(' ');
-          return {
-            numeroFactura: `FAC-${String(order.PedidoId).padStart(6, '0')}`,
-            cliente: nombre || `Cliente #${raw.ClienteId ?? order.PedidoId}`,
-            identificacion: raw.Cliente?.Identificacion ?? '',
-            fecha: order.FechaPedido,
-            estado: order.Estado || 'Emitida',
-            total: Number(order.Total ?? 0),
-            pedido: order,
-          };
-        });
-        this.cargando = false;
-      },
-      error: () => {
-        this.error = 'No se pudieron cargar los comprobantes de facturación.';
-        this.cargando = false;
-      },
-    });
   }
 
   verFactura(factura: InvoiceRow): void {

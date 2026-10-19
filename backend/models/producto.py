@@ -130,3 +130,9 @@ class Producto(Base):
     Marca: Mapped["Marca"] = relationship(
         "Marca",
     )
+
+    Imagenes: Mapped[list["ImagenProducto"]] = relationship(
+        "ImagenProducto",
+        back_populates="Producto",
+        cascade="all, delete-orphan",
+    )

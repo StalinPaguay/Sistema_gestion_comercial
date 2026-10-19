@@ -28,13 +28,16 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from config.database import get_db
 from models.categoria import Categoria
+from models.imagen_producto import ImagenProducto
 from models.marca import Marca
 from models.producto import Producto
+from models.proveedor import Proveedor
 from services.auth_service import require_admin
 
 
@@ -151,8 +154,7 @@ class ProductoEntrada(BaseModel):
         ProductoId, CategoriaId, MarcaId, SKU, Nombre,
         Descripcion, Precio, Stock, StockMinimo y Estado.
 
-    No se incluye ProveedorId ni FechaCreacion porque no son
-    columnas de la tabla Productos que revisamos.
+    La imagen y el proveedor se guardan en sus tablas relacionadas.
     """
 
     CategoriaId: int = Field(
@@ -195,6 +197,17 @@ class ProductoEntrada(BaseModel):
     Estado: bool = Field(
         default=True,
         description="Indica si el producto está activo",
+    )
+    UrlImagen: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=500,
+        description="URL de la imagen principal del producto",
+    )
+    ProveedorId: int | None = Field(
+        default=None,
+        gt=0,
+        description="Proveedor asociado al producto, si se especifica",
     )
 
 
@@ -253,6 +266,12 @@ class ProductoActualizacion(BaseModel):
     Estado: bool | None = Field(
         default=None,
         description="Nuevo estado",
+    )
+    UrlImagen: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=500,
+        description="Nueva URL de la imagen principal",
     )
 
 
@@ -353,6 +372,9 @@ def producto_json(producto: Producto) -> dict[str, Any]:
     pérdida de precisión en la representación del precio.
     """
 
+    imagenes = sorted(producto.Imagenes, key=lambda imagen: (not imagen.EsPrincipal, imagen.ImagenId))
+    imagen_principal = imagenes[0] if imagenes else None
+
     return {
         "ProductoId": producto.ProductoId,
         "CategoriaId": producto.CategoriaId,
@@ -370,6 +392,11 @@ def producto_json(producto: Producto) -> dict[str, Any]:
         "Stock": producto.Stock,
         "StockMinimo": producto.StockMinimo,
         "Estado": producto.Estado,
+        "UrlImagen": imagen_principal.UrlImagen if imagen_principal else None,
+        "ImagenesProducto": [
+            {"UrlImagen": imagen.UrlImagen, "EsPrincipal": imagen.EsPrincipal}
+            for imagen in imagenes
+        ],
     }
 
 
@@ -519,10 +546,47 @@ def crear_producto(
 
     validar_categoria(db, datos.CategoriaId)
     validar_marca(db, datos.MarcaId)
+    proveedor = db.get(Proveedor, datos.ProveedorId) if datos.ProveedorId is not None else None
+    if datos.ProveedorId is not None and (proveedor is None or not proveedor.Estado):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El proveedor seleccionado no existe o está inactivo.",
+        )
 
-    producto = Producto(**datos.model_dump())
+    datos_producto = datos.model_dump(exclude={"UrlImagen", "ProveedorId"})
+    producto = Producto(**datos_producto)
+    db.add(producto)
 
-    guardar(db, producto)
+    try:
+        db.flush()
+        if datos.UrlImagen:
+            db.add(ImagenProducto(
+                ProductoId=producto.ProductoId,
+                UrlImagen=datos.UrlImagen.strip(),
+                EsPrincipal=True,
+            ))
+        if proveedor:
+            db.execute(
+                text(
+                    "INSERT INTO dbo.ProductoProveedor (ProductoId, ProveedorId) "
+                    "VALUES (:producto_id, :proveedor_id)"
+                ),
+                {"producto_id": producto.ProductoId, "proveedor_id": proveedor.ProveedorId},
+            )
+        db.commit()
+        db.refresh(producto)
+    except IntegrityError as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se pudo guardar el producto porque existe un conflicto de integridad o un SKU duplicado.",
+        ) from error
+    except SQLAlchemyError as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ocurrió un error al guardar el producto, su imagen o su proveedor.",
+        ) from error
 
     return producto_json(producto)
 
@@ -551,8 +615,11 @@ def actualizar_producto(
 
     cambios = datos.model_dump(exclude_unset=True)
 
+    # La imagen se actualiza en su tabla relacionada, no en Productos.
+    url_imagen = cambios.pop("UrlImagen", None)
+
     # No aceptar solicitudes PATCH sin campos para actualizar.
-    if not cambios:
+    if not cambios and url_imagen is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Debe enviar al menos un campo para actualizar.",
@@ -574,6 +641,20 @@ def actualizar_producto(
     # Aplica exclusivamente los campos incluidos en la petición.
     for campo, valor in cambios.items():
         setattr(producto, campo, valor)
+
+    if url_imagen is not None:
+        imagen_principal = next(
+            (imagen for imagen in producto.Imagenes if imagen.EsPrincipal),
+            None,
+        )
+        if imagen_principal:
+            imagen_principal.UrlImagen = url_imagen.strip()
+        else:
+            producto.Imagenes.append(ImagenProducto(
+                ProductoId=producto.ProductoId,
+                UrlImagen=url_imagen.strip(),
+                EsPrincipal=True,
+            ))
 
     guardar(db, producto)
 

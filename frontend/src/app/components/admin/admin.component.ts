@@ -1,4 +1,5 @@
 import { CommonModule, CurrencyPipe } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -16,6 +17,13 @@ import {
 import { AuthService } from '../../services/auth.service';
 import { getProductImage } from '../../services/product-images.config';
 import { ThemeService } from '../../services/theme.service';
+import { TaxService } from '../../services/tax.service';
+
+const NON_WHITESPACE = Validators.pattern(/\S/);
+const INTEGER = Validators.pattern(/^\d+$/);
+const SUPPLIER_PHONE = Validators.pattern(/^\d{10}$/);
+const SUPPLIER_ID = Validators.pattern(/^(?:\d{10}|\d{13})$/);
+const IMAGE_URL = Validators.pattern(/^https?:\/\/\S+\.\S+$/i);
 
 type AdminTab =
   | 'dashboard'
@@ -26,7 +34,8 @@ type AdminTab =
   | 'promotions'
   | 'suppliers'
   | 'clients'
-  | 'billing';
+  | 'billing'
+  | 'settings';
 
 @Component({
   selector: 'app-admin',
@@ -39,11 +48,13 @@ export class AdminComponent implements OnInit, OnDestroy {
   protected readonly adminService = inject(AdminService);
   protected readonly authService = inject(AuthService);
   protected readonly themeService = inject(ThemeService);
+  protected readonly taxService = inject(TaxService);
   private readonly router = inject(Router);
   private refreshSubscription?: Subscription;
 
   ngOnInit(): void {
     this.adminService.refreshAllData();
+    this.loadTaxParameter();
     // Auto-actualizar cada 4 segundos para reflejar nuevos clientes y pedidos en tiempo real
     this.refreshSubscription = timer(4000, 4000).subscribe(() => {
       this.adminService.refreshAllData();
@@ -56,7 +67,54 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   manualRefresh(): void {
     this.adminService.refreshAllData();
+    this.loadTaxParameter();
     this.showAlert('Datos del sistema sincronizados con el servidor.');
+  }
+
+  loadTaxParameter(): void {
+    this.taxLoading.set(true);
+    this.taxLoadError.set('');
+    this.taxService.load().subscribe({
+      next: (parameter) => {
+        this.taxForm.controls.porcentaje.setValue(Number(parameter.Porcentaje));
+        this.taxLoading.set(false);
+      },
+      error: (error: unknown) => {
+        this.taxLoadError.set(error instanceof HttpErrorResponse && error.status === 404
+          ? 'No se encontró IVA_PORCENTAJE en la base de datos.'
+          : 'No se pudo leer el IVA desde el servidor.');
+        this.taxLoading.set(false);
+      },
+    });
+  }
+
+  saveTaxParameter(): void {
+    const percent = this.taxForm.controls.porcentaje.value;
+    if (this.taxForm.invalid || percent === null || this.taxSaving()) {
+      this.taxForm.markAllAsTouched();
+      return;
+    }
+    this.taxSaving.set(true);
+    this.taxService.update(percent).subscribe({
+      next: (parameter) => {
+        this.taxForm.controls.porcentaje.setValue(Number(parameter.Porcentaje));
+        this.taxSaving.set(false);
+        this.showAlert(`IVA actualizado a ${Number(parameter.Porcentaje)}%. Se aplicará en nuevos pedidos.`);
+      },
+      error: (error: unknown) => {
+        const detail = error instanceof HttpErrorResponse
+          ? (typeof error.error?.detail === 'string' ? error.error.detail : error.message)
+          : 'Error inesperado.';
+        this.taxSaving.set(false);
+        this.showAlert(`No se pudo guardar el IVA: ${detail}`, 'danger');
+      },
+    });
+  }
+
+  invoiceTaxPercent(invoice: AdminInvoice): string {
+    const taxableBase = Math.max(0, invoice.subtotal - invoice.descuento);
+    if (taxableBase <= 0) return this.taxService.ivaPercent().toFixed(2);
+    return ((invoice.impuesto / taxableBase) * 100).toFixed(2);
   }
 
   handleImageError(event: Event, sku: string): void {
@@ -78,6 +136,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   // Modales
   readonly showProductModal = signal(false);
   readonly editingProduct = signal<AdminProduct | null>(null);
+  readonly savingProduct = signal(false);
 
   readonly showCategoryModal = signal(false);
   readonly editingCategory = signal<AdminCategory | null>(null);
@@ -89,6 +148,12 @@ export class AdminComponent implements OnInit, OnDestroy {
   readonly editingPromotionId = signal<number | null>(null);
   readonly showSupplierModal = signal(false);
   readonly selectedInvoice = signal<AdminInvoice | null>(null);
+  readonly taxLoading = signal(false);
+  readonly taxSaving = signal(false);
+  readonly taxLoadError = signal('');
+  readonly taxForm = new FormGroup({
+    porcentaje: new FormControl<number | null>(15, [Validators.required, Validators.min(0), Validators.max(100)]),
+  });
 
   // Pedidos y Bloqueo
   readonly orderStatusFilter = signal<string>('Todos');
@@ -107,38 +172,39 @@ export class AdminComponent implements OnInit, OnDestroy {
   // ==========================================
   readonly productForm = new FormGroup({
     sku: new FormControl('', [Validators.required, Validators.minLength(3)]),
-    nombre: new FormControl('', [Validators.required, Validators.minLength(3)]),
-    descripcion: new FormControl('', [Validators.required]),
+    nombre: new FormControl('', [Validators.required, Validators.minLength(3), NON_WHITESPACE]),
+    descripcion: new FormControl('', [Validators.required, NON_WHITESPACE]),
     precio: new FormControl<number | null>(null, [Validators.required, Validators.min(0.01)]),
-    stock: new FormControl<number | null>(0, [Validators.required, Validators.min(0)]),
-    stockMinimo: new FormControl<number | null>(3, [Validators.required, Validators.min(0)]),
-    categoria: new FormControl('', [Validators.required]),
-    marca: new FormControl('', [Validators.required]),
-    urlImagen: new FormControl('', [Validators.required]),
+    stock: new FormControl<number | null>(0, [Validators.required, Validators.min(0), INTEGER]),
+    stockMinimo: new FormControl<number | null>(3, [Validators.required, Validators.min(0), INTEGER]),
+    categoria: new FormControl('', [Validators.required, NON_WHITESPACE]),
+    marca: new FormControl('', [Validators.required, NON_WHITESPACE]),
+    proveedorId: new FormControl<number | null>(null, [Validators.required]),
+    urlImagen: new FormControl(''),
     estado: new FormControl(true),
   });
 
   readonly categoryForm = new FormGroup({
-    nombre: new FormControl('', [Validators.required, Validators.minLength(2)]),
-    descripcion: new FormControl('', [Validators.required]),
+    nombre: new FormControl('', [Validators.required, Validators.minLength(2), NON_WHITESPACE]),
+    descripcion: new FormControl('', [Validators.required, NON_WHITESPACE]),
     estado: new FormControl(true),
   });
 
   readonly movementForm = new FormGroup({
     productoId: new FormControl<number | null>(null, [Validators.required]),
     tipoMovimiento: new FormControl<'Entrada' | 'Salida' | 'Ajuste'>('Entrada', [Validators.required]),
-    cantidad: new FormControl<number | null>(1, [Validators.required, Validators.min(1)]),
+    cantidad: new FormControl<number | null>(1, [Validators.required, Validators.min(1), INTEGER]),
     proveedor: new FormControl(''),
-    motivo: new FormControl('', [Validators.required, Validators.minLength(4)]),
+    motivo: new FormControl('', [Validators.required, Validators.minLength(4), NON_WHITESPACE]),
     observacion: new FormControl(''),
   });
 
   readonly promotionForm = new FormGroup({
-    nombre: new FormControl('', [Validators.required, Validators.minLength(3)]),
+    nombre: new FormControl('', [Validators.required, Validators.minLength(3), NON_WHITESPACE]),
     codigoCupon: new FormControl('', [Validators.maxLength(50)]),
     tipo: new FormControl<'Porcentaje' | 'Monto Fijo'>('Porcentaje', [Validators.required]),
     valor: new FormControl<number | null>(10, [Validators.required, Validators.min(0.1)]),
-    montoMinimo: new FormControl<number | null>(null),
+    montoMinimo: new FormControl<number | null>(null, [Validators.min(0)]),
     fechaInicio: new FormControl('', [Validators.required]),
     fechaFin: new FormControl('', [Validators.required]),
     aplicaA: new FormControl<'Producto' | 'Categoria' | 'General'>('General', [Validators.required]),
@@ -146,12 +212,12 @@ export class AdminComponent implements OnInit, OnDestroy {
   });
 
   readonly supplierForm = new FormGroup({
-    identificacion: new FormControl('', [Validators.required, Validators.minLength(10), Validators.maxLength(13)]),
-    nombre: new FormControl('', [Validators.required, Validators.minLength(3)]),
+    identificacion: new FormControl('', [Validators.required, SUPPLIER_ID]),
+    nombre: new FormControl('', [Validators.required, Validators.minLength(3), NON_WHITESPACE]),
     contacto: new FormControl(''),
-    telefono: new FormControl('', [Validators.required, Validators.minLength(7)]),
+    telefono: new FormControl('', [Validators.required, SUPPLIER_PHONE]),
     correo: new FormControl('', [Validators.required, Validators.email]),
-    direccion: new FormControl('', [Validators.required]),
+    direccion: new FormControl('', [Validators.required, NON_WHITESPACE]),
     estado: new FormControl(true),
   });
 
@@ -234,14 +300,19 @@ export class AdminComponent implements OnInit, OnDestroy {
   // ==========================================
   openNewProductModal(): void {
     this.editingProduct.set(null);
+    this.productForm.controls.proveedorId.setValidators([Validators.required]);
+    this.productForm.controls.proveedorId.updateValueAndValidity();
+    this.productForm.controls.urlImagen.setValidators([Validators.required, IMAGE_URL]);
+    this.productForm.controls.urlImagen.updateValueAndValidity();
     this.productForm.reset({
-      sku: `TEC-${Math.floor(1000 + Math.random() * 9000)}`,
+      sku: `TEC-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
       precio: null,
       stock: 5,
       stockMinimo: 3,
       categoria: this.adminService.categories()[0]?.nombre || '',
       marca: 'TECNOMEGA',
-      urlImagen: 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=500',
+      proveedorId: null,
+      urlImagen: '',
       estado: true,
     });
     this.showProductModal.set(true);
@@ -249,6 +320,10 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   openEditProductModal(product: AdminProduct): void {
     this.editingProduct.set(product);
+    this.productForm.controls.proveedorId.clearValidators();
+    this.productForm.controls.proveedorId.updateValueAndValidity();
+    this.productForm.controls.urlImagen.setValidators([IMAGE_URL]);
+    this.productForm.controls.urlImagen.updateValueAndValidity();
     this.productForm.patchValue({
       sku: product.sku,
       nombre: product.nombre,
@@ -258,6 +333,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       stockMinimo: product.stockMinimo,
       categoria: product.categoria,
       marca: product.marca,
+      proveedorId: product.proveedorId ?? null,
       urlImagen: product.urlImagen,
       estado: product.estado,
     });
@@ -280,19 +356,58 @@ export class AdminComponent implements OnInit, OnDestroy {
       stockMinimo: Number(val.stockMinimo),
       categoria: val.categoria!,
       marca: val.marca!.trim(),
+      proveedorId: Number(val.proveedorId),
       urlImagen: val.urlImagen!.trim(),
       estado: val.estado ?? true,
     };
 
     if (this.editingProduct()) {
-      this.adminService.updateProduct(this.editingProduct()!.productoId, productData);
-      this.showAlert(`Producto "${productData.nombre}" actualizado con éxito.`);
+      const changes: Partial<typeof productData> = { ...productData };
+      if (!productData.urlImagen || productData.urlImagen === (this.editingProduct()!.urlImagen ?? '')) {
+        delete changes.urlImagen;
+      }
+      this.savingProduct.set(true);
+      this.adminService.updateProduct(this.editingProduct()!.productoId, changes).subscribe({
+        next: () => {
+          this.savingProduct.set(false);
+          this.showAlert(`Producto "${productData.nombre}" actualizado con éxito.`);
+          this.showProductModal.set(false);
+        },
+        error: (error: unknown) => {
+          this.savingProduct.set(false);
+          const message = error instanceof HttpErrorResponse
+            ? (typeof error.error?.detail === 'string'
+                ? error.error.detail
+                : typeof error.error?.mensaje === 'string'
+                  ? error.error.mensaje
+                  : error.message)
+            : 'No se pudo actualizar el producto. Inténtalo de nuevo.';
+          this.showAlert(`No se pudo actualizar el producto: ${message}`, 'danger');
+        },
+      });
     } else {
-      this.adminService.addProduct(productData);
-      this.showAlert(`Producto "${productData.nombre}" registrado exitosamente en el catálogo.`);
+      this.savingProduct.set(true);
+      this.adminService.addProduct(productData).subscribe({
+        next: (savedProduct) => {
+          this.savingProduct.set(false);
+          this.showProductModal.set(false);
+          this.showAlert(`Producto "${savedProduct.nombre}" registrado exitosamente en el catálogo.`);
+        },
+        error: (error: unknown) => {
+          this.savingProduct.set(false);
+          const message = error instanceof HttpErrorResponse
+            ? (typeof error.error?.detail === 'string'
+                ? error.error.detail
+                : typeof error.error?.mensaje === 'string'
+                  ? error.error.mensaje
+                  : error.message)
+            : error instanceof Error
+              ? error.message
+              : 'No se pudo guardar el producto. Inténtalo de nuevo.';
+          this.showAlert(`No se pudo registrar el producto: ${message}`, 'danger');
+        },
+      });
     }
-
-    this.showProductModal.set(false);
   }
 
   toggleProductState(product: AdminProduct): void {
@@ -451,6 +566,14 @@ export class AdminComponent implements OnInit, OnDestroy {
     }
 
     const val = this.promotionForm.getRawValue();
+    if (val.tipo === 'Porcentaje' && Number(val.valor) > 100) {
+      this.showAlert('El porcentaje de descuento debe estar entre 0.1 y 100.', 'danger');
+      return;
+    }
+    if (val.montoMinimo !== null && Number(val.montoMinimo) < 0) {
+      this.showAlert('El monto mínimo de compra no puede ser negativo.', 'danger');
+      return;
+    }
     if (val.fechaFin! < val.fechaInicio!) {
       this.showAlert('La fecha de fin no puede ser anterior a la fecha de inicio.', 'danger');
       return;

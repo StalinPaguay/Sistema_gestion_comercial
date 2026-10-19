@@ -19,17 +19,18 @@
 
   <section class="table-card">
     <div class="table-toolbar">
-      <div><h2>Facturas Registradas</h2><p>Comprobantes comerciales emitidos de tus pedidos.</p></div>
+      <div><h2>Facturas Registradas</h2><p>Comprobantes emitidos y registrados en el sistema.</p></div>
       <input type="search" class="search-input" placeholder="Buscar factura, fecha o estado..." [(ngModel)]="busqueda" aria-label="Buscar facturas" />
     </div>
     <div class="table-responsive">
       <table>
-        <thead><tr><th>N.º FACTURA</th><th>CLIENTE</th><th>FECHA</th><th>ESTADO</th><th class="text-right">TOTAL</th><th class="text-center">ACCIONES</th></tr></thead>
+        <thead><tr><th>N.º FACTURA</th><th>CLIENTE</th><th>FECHA</th><th>PAGO</th><th>ESTADO</th><th class="text-right">TOTAL</th><th class="text-center">ACCIONES</th></tr></thead>
         <tbody>
           <tr *ngFor="let factura of facturasFiltradas">
             <td class="invoice-number">{{ factura.numeroFactura }}</td>
             <td><strong>{{ factura.cliente }}</strong><small>{{ factura.identificacion || 'Consumidor Final' }}</small></td>
             <td>{{ factura.fecha | date:'dd/MM/yyyy HH:mm' }}</td>
+            <td>{{ factura.metodoPago }}</td>
             <td><span class="status-badge" [class.badge-paid]="factura.estado === 'Pagada' || factura.estado === 'Entregado'">{{ factura.estado }}</span></td>
             <td class="text-right amount">{{ factura.total | currency:'USD':'symbol':'1.2-2' }}</td>
             <td class="text-center">
@@ -37,7 +38,7 @@
               <button type="button" class="btn-action btn-print" (click)="imprimirFactura(factura)">Imprimir</button>
             </td>
           </tr>
-          <tr *ngIf="!cargando && facturasFiltradas.length === 0"><td colspan="6" class="empty-state">No se encontraron comprobantes registrados.</td></tr>
+          <tr *ngIf="!cargando && facturasFiltradas.length === 0"><td colspan="7" class="empty-state">No se encontraron facturas registradas.</td></tr>
         </tbody>
       </table>
     </div>
@@ -69,7 +70,7 @@
         <div><span>Razón Social / Cliente:</span><strong>{{ facturaSeleccionada.cliente }}</strong></div>
         <div><span>C.I. / RUC:</span><strong>{{ facturaSeleccionada.identificacion || 'Consumidor Final' }}</strong></div>
         <div><span>Fecha de Emisión:</span><strong>{{ facturaSeleccionada.fecha | date:'dd/MM/yyyy HH:mm' }}</strong></div>
-        <div><span>Forma de Pago:</span><strong>Contado / Tarjeta / Transferencia</strong></div>
+        <div><span>Forma de Pago:</span><strong>{{ facturaSeleccionada.metodoPago }}</strong></div>
       </div>
       <table class="detail-table">
         <thead><tr><th>Descripción del Producto</th><th class="text-center">Cant.</th><th class="text-right">Precio Unit.</th><th class="text-right">Subtotal</th><th class="text-right">Descuento</th><th class="text-right">Total</th></tr></thead>
@@ -87,7 +88,7 @@
       <div class="totals">
         <p><span>Subtotal:</span><strong>{{ +facturaSeleccionada.pedido.Subtotal | currency:'USD':'symbol':'1.2-2' }}</strong></p>
         <p class="discount-row"><span>Descuento aplicado:</span><strong>-{{ +facturaSeleccionada.pedido.Descuento | currency:'USD':'symbol':'1.2-2' }}</strong></p>
-        <p><span>IVA (15%):</span><strong>{{ +(facturaSeleccionada.pedido.IVA ?? 0) | currency:'USD':'symbol':'1.2-2' }}</strong></p>
+        <p><span>IVA ({{ impuestoPorcentaje(facturaSeleccionada) }}%):</span><strong>{{ +(facturaSeleccionada.pedido.IVA ?? 0) | currency:'USD':'symbol':'1.2-2' }}</strong></p>
         <p class="grand-total"><span>Total a Pagar:</span><strong>{{ facturaSeleccionada.total | currency:'USD':'symbol':'1.2-2' }}</strong></p>
       </div>
       <div class="invoice-footer">

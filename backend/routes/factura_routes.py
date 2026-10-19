@@ -19,7 +19,7 @@ from models.pago import Pago
 from models.pedido import Pedido
 from models.pedido_detalle import PedidoDetalle
 from models.usuario import Usuario
-from services.auth_service import get_current_user
+from services.auth_service import get_current_user, require_admin
 from services.pdf_service import generar_pdf_factura
 
 router = APIRouter(
@@ -81,6 +81,7 @@ def serializar_factura(fac: Factura, db: Session) -> dict[str, Any]:
         }
 
     fecha_iso = fac.Fecha.isoformat() if fac.Fecha else None
+    pagos = db.query(Pago).filter(Pago.PedidoId == fac.PedidoId).all() if fac.PedidoId else []
 
     return {
         "FacturaId": fac.FacturaId,
@@ -98,6 +99,18 @@ def serializar_factura(fac: Factura, db: Session) -> dict[str, Any]:
         "IVA": str(fac.Impuesto),
         "Total": str(fac.Total),
         "Estado": fac.Estado,
+        "Pagos": [
+            {
+                "PagoId": pago.PagoId,
+                "MetodoPagoId": pago.MetodoPagoId,
+                "MetodoPago": pago.MetodoPago.Nombre if pago.MetodoPago else "",
+                "FechaPago": pago.FechaPago.isoformat() if pago.FechaPago else None,
+                "Monto": str(pago.Monto),
+                "Estado": pago.Estado,
+                "TransaccionId": pago.TransaccionId,
+            }
+            for pago in pagos
+        ],
         "Items": items,
         "detalles": items,
     }
@@ -105,14 +118,21 @@ def serializar_factura(fac: Factura, db: Session) -> dict[str, Any]:
 
 def emitir_factura_logica(pedido: Pedido, usuario_id: int, db: Session) -> Factura | None:
     """Emite una factura para un pedido dado, evitando duplicados."""
+    pagos_confirmados = db.query(Pago).filter(
+        Pago.PedidoId == pedido.PedidoId,
+        Pago.Estado == "Pagado",
+    ).all()
+    total_pagado = sum((pago.Monto for pago in pagos_confirmados), Decimal("0.00"))
+
     factura_existente = (
         db.query(Factura)
         .filter(Factura.PedidoId == pedido.PedidoId, Factura.Estado != "Anulada")
         .first()
     )
     if factura_existente:
-        if pedido.Estado == "Entregado" and factura_existente.Estado != "Pagada":
-            factura_existente.Estado = "Pagada"
+        nuevo_estado = "Pagada" if total_pagado >= factura_existente.Total else "Emitida"
+        if factura_existente.Estado != nuevo_estado:
+            factura_existente.Estado = nuevo_estado
             db.flush()
         return factura_existente
 
@@ -121,7 +141,7 @@ def emitir_factura_logica(pedido: Pedido, usuario_id: int, db: Session) -> Factu
         return None
 
     numero = generar_numero_factura(db)
-    estado_factura = "Pagada" if pedido.Estado == "Entregado" else "Emitida"
+    estado_factura = "Pagada" if total_pagado >= pedido.Total else "Emitida"
 
     factura = Factura(
         Numero=numero,
@@ -136,6 +156,14 @@ def emitir_factura_logica(pedido: Pedido, usuario_id: int, db: Session) -> Factu
         Estado=estado_factura,
     )
     db.add(factura)
+    db.flush()
+
+    # Se conserva el cálculo y el porcentaje con que nació el pedido, aunque el IVA
+    # general se actualice antes de emitir la factura.
+    factura.Subtotal = pedido.Subtotal
+    factura.Descuento = pedido.Descuento
+    factura.Impuesto = pedido.IVA
+    factura.Total = pedido.Total
     db.flush()
 
     for d in detalles_pedido:
@@ -155,6 +183,11 @@ def emitir_factura_logica(pedido: Pedido, usuario_id: int, db: Session) -> Factu
         db.add(det_fac)
 
     db.flush()
+    factura.Subtotal = pedido.Subtotal
+    factura.Descuento = pedido.Descuento
+    factura.Impuesto = pedido.IVA
+    factura.Total = pedido.Total
+    db.flush()
     db.refresh(factura)
     return factura
 
@@ -172,17 +205,19 @@ def listar_facturas(
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(get_current_user),
 ):
-    # Auto-emitir facturas para cualquier pedido Entregado que aún no tenga factura registrada
-    pedidos_entregados_sin_fac = (
-        db.query(Pedido)
-        .filter(
-            Pedido.Estado == "Entregado",
-            ~Pedido.PedidoId.in_(
-                db.query(Factura.PedidoId).filter(Factura.PedidoId != None, Factura.Estado != "Anulada")
-            ),
+    # Solo la consulta administrativa puede emitir facturas como efecto secundario.
+    pedidos_entregados_sin_fac = []
+    if usuario.Rol and usuario.Rol.Nombre == "Administrador":
+        pedidos_entregados_sin_fac = (
+            db.query(Pedido)
+            .filter(
+                Pedido.Estado == "Entregado",
+                ~Pedido.PedidoId.in_(
+                    db.query(Factura.PedidoId).filter(Factura.PedidoId != None, Factura.Estado != "Anulada")
+                ),
+            )
+            .all()
         )
-        .all()
-    )
     if pedidos_entregados_sin_fac:
         for ped in pedidos_entregados_sin_fac:
             emitir_factura_logica(ped, ped.UsuarioId, db)
@@ -286,7 +321,7 @@ def descargar_factura_pdf(
 def emitir_factura(
     datos: EmitirFacturaEntrada,
     db: Session = Depends(get_db),
-    usuario: Usuario = Depends(get_current_user),
+    usuario: Usuario = Depends(require_admin),
 ):
     pedido = db.get(Pedido, datos.PedidoId)
     if not pedido:
@@ -333,7 +368,7 @@ def emitir_factura(
 def anular_factura(
     factura_id: int,
     db: Session = Depends(get_db),
-    _user: Any = Depends(get_current_user),
+    _user: Any = Depends(require_admin),
 ):
     fac = db.get(Factura, factura_id)
     if not fac:
@@ -368,11 +403,23 @@ def listar_metodos_pago(
 def registrar_pago(
     datos: PagoEntrada,
     db: Session = Depends(get_db),
-    _user: Any = Depends(get_current_user),
+    _user: Any = Depends(require_admin),
 ):
     pedido = db.get(Pedido, datos.PedidoId)
     if not pedido:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido no encontrado.")
+
+    pagos_previos = db.query(Pago).filter(
+        Pago.PedidoId == pedido.PedidoId,
+        Pago.Estado == "Pagado",
+    ).all()
+    total_pagado_previo = sum((pago.Monto for pago in pagos_previos), Decimal("0.00"))
+    saldo_pendiente = max(Decimal("0.00"), pedido.Total - total_pagado_previo)
+    if datos.Monto > saldo_pendiente:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El pago supera el saldo pendiente de ${saldo_pendiente}.",
+        )
 
     metodo = db.get(MetodoPago, datos.MetodoPagoId)
     if not metodo or not metodo.Estado:
@@ -391,8 +438,7 @@ def registrar_pago(
 
         # Si el monto cubre el total del pedido, actualizar el estado del pedido a 'Procesando'
         # Esto además dispara el trigger TR_Pedidos_ActualizarInventario para descontar stock!
-        pagos_previos = db.query(Pago).filter(Pago.PedidoId == pedido.PedidoId, Pago.Estado == "Pagado").all()
-        total_pagado = sum((p.Monto for p in pagos_previos), Decimal("0.00")) + datos.Monto
+        total_pagado = total_pagado_previo + datos.Monto
 
         if total_pagado >= pedido.Total and pedido.Estado == "Pendiente":
             pedido.Estado = "Procesando"

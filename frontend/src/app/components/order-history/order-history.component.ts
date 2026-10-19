@@ -6,6 +6,7 @@ import { Subscription, catchError, forkJoin, of, switchMap, timer } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { CustomerOrder, OrderService } from '../../services/order.service';
 import { getProductImage } from '../../services/product.service';
+import { TaxService } from '../../services/tax.service';
 
 @Component({
   selector: 'app-order-history',
@@ -17,6 +18,7 @@ import { getProductImage } from '../../services/product.service';
 export class OrderHistoryComponent implements OnInit, OnDestroy {
   private readonly document = inject(DOCUMENT);
   private readonly orderService = inject(OrderService);
+  private readonly taxService = inject(TaxService);
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -46,6 +48,7 @@ export class OrderHistoryComponent implements OnInit, OnDestroy {
   >([]);
 
   ngOnInit(): void {
+    this.taxService.load().subscribe({ error: () => undefined });
     this.loadClientNotifications();
     const createdOrderId = this.route.snapshot.queryParamMap.get('pedido');
     if (createdOrderId) {
@@ -168,16 +171,25 @@ export class OrderHistoryComponent implements OnInit, OnDestroy {
 
   protected orderTax(order: CustomerOrder): number {
     const reportedTax = this.moneyValue(order.IVA);
-    if (reportedTax > 0) {
+    if (order.IVA !== null && order.IVA !== undefined) {
       return reportedTax;
     }
-    return Math.max(0, this.moneyValue(order.Subtotal)) * 0.15;
+    const taxableBase = Math.max(0, this.moneyValue(order.Subtotal) - this.moneyValue(order.Descuento));
+    return taxableBase * this.taxService.ivaPercent() / 100;
+  }
+
+  protected orderTaxPercent(order: CustomerOrder): string {
+    const taxableBase = Math.max(0, this.moneyValue(order.Subtotal) - this.moneyValue(order.Descuento));
+    const tax = this.moneyValue(order.IVA);
+    return order.IVA !== null && order.IVA !== undefined && taxableBase > 0
+      ? ((tax / taxableBase) * 100).toFixed(2)
+      : this.taxService.ivaPercent().toFixed(2);
   }
 
   protected orderTotal(order: CustomerOrder): number {
     const reportedTax = this.moneyValue(order.IVA);
     const reportedTotal = this.moneyValue(order.Total);
-    if (reportedTax > 0 && reportedTotal > 0) {
+    if (order.Total !== null && order.Total !== undefined) {
       return reportedTotal;
     }
     const subtotalAfterDiscount = Math.max(

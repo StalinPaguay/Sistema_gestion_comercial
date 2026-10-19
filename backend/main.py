@@ -17,6 +17,7 @@ from routes.factura_routes import router as factura_router
 from routes.interaccion_routes import router as interaccion_router
 from routes.inventario_routes import router as inventario_router
 from routes.pedido_routes import router as pedido_router
+from routes.parametro_routes import router as parametro_router
 from routes.promocion_routes import router as promocion_router
 from routes.proveedor_routes import router as proveedor_router
 
@@ -112,6 +113,7 @@ app.include_router(catalogo_router)
 app.include_router(cliente_router)
 app.include_router(carrito_router)
 app.include_router(pedido_router)
+app.include_router(parametro_router)
 app.include_router(factura_router)
 app.include_router(inventario_router)
 app.include_router(proveedor_router)

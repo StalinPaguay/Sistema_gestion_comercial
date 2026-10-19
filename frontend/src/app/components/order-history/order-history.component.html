@@ -159,7 +159,7 @@
           <div class="totals">
             <p><span>Subtotal</span><strong>{{ detail.Subtotal | currency: 'USD' }}</strong></p>
             <p><span>Descuentos</span><strong>−{{ detail.Descuento | currency: 'USD' }}</strong></p>
-            <p><span>IVA (15%)</span><strong>{{ orderTax(detail) | currency: 'USD' }}</strong></p>
+            <p><span>IVA ({{ orderTaxPercent(detail) }}%)</span><strong>{{ orderTax(detail) | currency: 'USD' }}</strong></p>
             <p class="grand-total">
               <span>Total</span><strong>{{ orderTotal(detail) | currency: 'USD' }}</strong>
             </p>
